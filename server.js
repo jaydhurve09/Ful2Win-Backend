@@ -18,6 +18,8 @@ dotenv.config();
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/Cloudinary.js';
 import postRoutes from './routes/postRoute.js';
+import gameRoutes from './routes/gameRoutes.js';
+import fileUpload from 'express-fileupload';
 
 // Initialize database and cloud services
 connectDB();
@@ -25,11 +27,46 @@ connectCloudinary();
 
 // Basic middleware
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // API Routes
 app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+
+// Serve static game files
+app.use('/games', express.static(path.join(__dirname, 'games')));
+
+// Simple request logging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
+
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: '/tmp/',
+  createParentPath: true,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB max file size
+}));
+
+// Debug: Log body and files after fileUpload middleware
+app.use((req, res, next) => {
+  console.log('--- DEBUG MIDDLEWARE ---');
+  console.log('Method:', req.method, 'URL:', req.originalUrl);
+  console.log('Headers:', req.headers);
+  console.log('req.body:', req.body);
+  console.log('req.files:', req.files);
+  console.log('------------------------');
+  next();
+});
+
+// API Routes - This comes AFTER fileUpload middleware
+app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+
+//Serve static game files
+app.use('/games', express.static(path.join(__dirname, 'games')));
 
 // Simple request logging
 app.use((req, res, next) => {
