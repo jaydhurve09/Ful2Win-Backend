@@ -406,12 +406,33 @@ const submitScore = async (req, res) => {
       }
       
       await match.save();
-      return res.json({ 
-        success: true, 
-        message: 'Match completed', 
-        winner: winner ? winner.name : 'Draw',
-        match 
-      });
+      
+      // Prepare response with detailed winner information
+      const currentPlayer = match.players.find(p => String(p.player_id) === String(player_id));
+      const opponent = match.players.find(p => String(p.player_id) !== String(player_id));
+      
+      const response = {
+        success: true,
+        message: 'Match completed',
+        isDraw: !winner,
+        winner: winner ? {
+          player_id: winner.player_id,
+          player_name: winner.player_name,
+          score: winner.player_id === match.players[0].player_id ? match.players[0].score : match.players[1].score
+        } : null,
+        currentPlayer: {
+          score: currentPlayer.score,
+          isWinner: winner ? String(winner.player_id) === String(player_id) : false
+        },
+        opponent: opponent ? {
+          player_id: opponent.player_id,
+          player_name: opponent.player_name,
+          score: opponent.score
+        } : null,
+        match
+      };
+      
+      return res.json(response);
     } else {
       await match.save();
       return res.json({ 
