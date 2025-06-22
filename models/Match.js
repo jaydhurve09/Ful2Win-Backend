@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
 const playerSchema = new mongoose.Schema({
-  id: { type: String, required: true },
-  name: { type: String, required: true },
+  player_id: { type: String, required: true },
+  player_name: { type: String, required: true },
   score: { type: Number, default: null }
 });
 
@@ -12,8 +12,8 @@ const matchSchema = new mongoose.Schema({
   entry_fee: { type: Number, required: true },
   players: [playerSchema],
   winner: {
-    id: { type: String, default: null },
-    name: { type: String, default: null }
+    player_id: { type: String, default: null },
+    player_name: { type: String, default: null }
   },
   status: { type: String, enum: ['waiting', 'active', 'completed'], default: 'waiting' }
 }, { timestamps: true });

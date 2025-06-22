@@ -284,12 +284,39 @@ const submitScore = async (req, res) => {
   try {
     const { match_id, player_id, player_name, score, game } = req.body;
     
+    console.log('submitScore called with:', { match_id, player_id, player_name, score, game });
+    
     // Validate required fields
-    if (!match_id || !player_id || !player_name || typeof score !== 'number') {
+    if (!match_id || !player_id || typeof score !== 'number') {
+      const error = 'Missing required fields: ' + 
+        (!match_id ? 'match_id ' : '') + 
+        (!player_id ? 'player_id ' : '') + 
+        (typeof score !== 'number' ? 'score' : '');
+      
+      console.error('Validation error:', error);
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields: match_id, player_id, player_name, or score' 
+        error: error.trim() 
       });
+    }
+    
+    // If player_name is not provided, try to get it from the database
+    let finalPlayerName = player_name;
+    if (!finalPlayerName) {
+      try {
+        const user = await User.findById(player_id).select('name username').lean();
+        if (user) {
+          finalPlayerName = user.name || user.username || `Player-${player_id.substring(0, 6)}`;
+          console.log(`Fetched player name from database: ${finalPlayerName}`);
+        } else {
+          finalPlayerName = `Player-${player_id.substring(0, 6)}`;
+          console.log(`Using generated player name: ${finalPlayerName}`);
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+        finalPlayerName = `Player-${player_id.substring(0, 6)}`;
+        console.log(`Fallback to generated player name: ${finalPlayerName}`);
+      }
     }
     
     let match = await Match.findOne({ match_id });
@@ -301,14 +328,14 @@ const submitScore = async (req, res) => {
         game: game || 'unknown',
         entry_fee: 0,
         players: [{
-          id: player_id,
-          name: player_name,
+          player_id: player_id,
+          player_name: finalPlayerName,
           score: score
         }],
         status: 'waiting',
         winner: {
-          id: null,
-          name: null
+          player_id: null,
+          player_name: null
         }
       });
       await match.save();
@@ -320,17 +347,29 @@ const submitScore = async (req, res) => {
     }
     
     // Update existing player score or add new player
-    const playerIdx = match.players.findIndex(p => p.id === player_id);
-    if (playerIdx !== -1) {
-      match.players[playerIdx].score = score;
+    console.log('Current players in match:', match.players);
+    
+    // Convert both IDs to strings for comparison to avoid type mismatches
+    const playerIdStr = String(player_id);
+    const playerIndex = match.players.findIndex(p => String(p.player_id) === String(player_id));
+    
+    if (playerIndex !== -1) {
+      // Update existing player's score
+      match.players[playerIndex].score = score;
+      // Update player name in case it was missing before
+      if (!match.players[playerIndex].player_name) {
+        match.players[playerIndex].player_name = finalPlayerName;
+      }
+      console.log(`Updated score for existing player ${player_id} to ${score}`);
     } else {
+      // Add new player
       match.players.push({
-        id: player_id,
-        name: player_name,
+        player_id: player_id,
+        player_name: finalPlayerName,
         score: score
       });
+      console.log(`Added new player ${player_id} with score ${score}`);
     }
-    
     // If we have 2 players, mark as active
     if (match.players.length === 2) {
       match.status = 'active';
@@ -342,9 +381,15 @@ const submitScore = async (req, res) => {
       let winner = null;
       
       if (p1.score > p2.score) {
-        winner = { id: p1.id, name: p1.name };
+        winner = { 
+          player_id: p1.player_id, 
+          player_name: p1.player_name 
+        };
       } else if (p2.score > p1.score) {
-        winner = { id: p2.id, name: p2.name };
+        winner = { 
+          player_id: p2.player_id, 
+          player_name: p2.player_name 
+        };
       }
       // else it's a tie, winner remains null
       
@@ -352,8 +397,8 @@ const submitScore = async (req, res) => {
       match.status = 'completed';
       
       // Update winner's balance if there is a winner
-      if (winner && winner.id) {
-        const user = await User.findOne({ _id: winner.id });
+      if (winner && winner.player_id) {
+        const user = await User.findOne({ _id: winner.player_id });
         if (user) {
           user.Balance += match.entry_fee * 2; // Winner takes all
           await user.save();
@@ -388,41 +433,51 @@ const submitScore = async (req, res) => {
 // Create a new match for Whack A Mole or any game
 const createMatch = async (req, res) => {
   try {
+    console.log('createMatch called with body:', req.body);
     console.log('Request body:', req.body);
     
     const { game, entry_fee, player1_id, player1_name } = req.body;
     
-    console.log('Parsed fields:', { game, entry_fee, player1_id, player1_name });
+    console.log('Extracted fields:', { game, entry_fee, player1_id, player1_name });
     
     if (!game || typeof entry_fee === 'undefined' || !player1_id || !player1_name) {
-      console.log('Missing fields:', { 
-        hasGame: !!game, 
-        hasEntryFee: typeof entry_fee !== 'undefined', 
-        hasPlayer1Id: !!player1_id,
-        hasPlayer1Name: !!player1_name
+      const error = 'Missing required fields: ' + 
+        (!game ? 'game ' : '') + 
+        (typeof entry_fee === 'undefined' ? 'entry_fee ' : '') + 
+        (!player1_id ? 'player1_id ' : '') + 
+        (!player1_name ? 'player1_name' : '');
+      
+      console.error('Validation error:', error);
+      return res.status(400).json({ 
+        success: false, 
+        error: error.trim() 
       });
-      return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
     
     // Generate unique match_id
     const match_id = (game.substring(0,2).toUpperCase() || 'XX') + Date.now();
     
     // Create match with player info
-    const match = await Match.create({
+    const matchData = {
       match_id,
       game,
       entry_fee,
       players: [{
-        id: player1_id,
-        name: player1_name,
+        player_id: player1_id,
+        player_name: player1_name,
         score: null
       }],
       status: 'waiting',
-      winner: {
-        id: null,
-        name: null
+      winner: { 
+        player_id: null, 
+        player_name: null 
       }
-    });
+    };
+    
+    console.log('Creating match with data:', JSON.stringify(matchData, null, 2));
+    
+    const match = await Match.create(matchData);
+    console.log('Match created successfully:', match);
     
     console.log('Match created:', match);
     res.json({ success: true, match });
