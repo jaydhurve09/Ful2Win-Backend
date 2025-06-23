@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CarRacer</title> 
+  <link href="https://fonts.googleapis.com/css?family=Josefin+Sans&display=swap" rel="stylesheet" />
+  <link href="styles.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="carGame">
+    <div class="timer"></div>
+    <div class="score"></div>
+    <div class="startScreen">
+      <p>
+        Tap to start <br />
+        Swipe or drag joystick (on mobile) <br />
+        Or use Arrow keys on PC.<br />
+        Avoid enemy cars!
+      </p>
+    </div>
+    <div class="gameArea">
+      <!-- Joystick placed inside gameArea to prevent screen shift -->
+      <div class="joystick-container">
+        <div class="joystick" id="joystick"></div>
+      </div>
+    </div>
+  </div>
+  <script src="gameHandler.js"></script>
+</body>
+</html>

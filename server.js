@@ -3,11 +3,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fileUpload from 'express-fileupload';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/Cloudinary.js';
 import postRoutes from './routes/postRoute.js';
 import gameRoutes from './routes/gameRoutes.js';
-import fileUpload from 'express-fileupload';
+import carRacingRoute from './routes/carRacingRoute.js';
 
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -51,6 +52,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // API Routes
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+
+// Game routes
+app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
+
+// Alias for the game with the actual directory name
+app.use('/games/2d%20Car%20Racing%20Updated', carRacingRoute);
 
 // Serve static game files
 app.use('/games', express.static(path.join(__dirname, 'games')));

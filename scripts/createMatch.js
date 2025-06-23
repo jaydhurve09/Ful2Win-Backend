@@ -3,6 +3,9 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+const execAsync = promisify(exec);
 
 // Configure environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -75,6 +78,23 @@ async function makeRequest(url, method, data) {
   }
 }
 
+// Function to open URL in default browser
+async function openBrowser(url) {
+  try {
+    const command = process.platform === 'win32' 
+      ? `start "" "${url}"` 
+      : process.platform === 'darwin' 
+        ? `open "${url}"` 
+        : `xdg-open "${url}"`;
+    
+    await execAsync(command);
+    return true;
+  } catch (error) {
+    console.error('Could not open browser:', error);
+    return false;
+  }
+}
+
 async function createMatch() {
   try {
     log('🚀 Starting match creation process...');
@@ -85,14 +105,14 @@ async function createMatch() {
       `${API_BASE}/create-match`,
       'POST',
       {
-        game: 'whackamole',
+        game: '2d-car-racing',
         entry_fee: 0,
         player1_id: PLAYER_1.id,
         player1_name: PLAYER_1.name
       }
     );
 
-    const matchId = createMatchResult.match?.match_id;
+    const matchId = createMatchResult.match?.match_id || createMatchResult.match?._id;
     if (!matchId) {
       throw new Error('Failed to create match: No match ID in response');
     }
@@ -100,7 +120,7 @@ async function createMatch() {
     log(`✅ Successfully created match with ID: ${matchId}`);
 
     // Generate player URLs - using port 5001 to match the server
-    const baseUrl = 'http://localhost:5001/games/Whack-A-Mole';
+    const baseUrl = 'http://localhost:5001/games/2d-car-racing';
     const player1Url = `${baseUrl}/?match_id=${matchId}&player_id=${PLAYER_1.id}`;
     const player2Url = `${baseUrl}/?match_id=${matchId}&player_id=${PLAYER_2.id}`;
 
@@ -114,9 +134,11 @@ async function createMatch() {
         player_id: PLAYER_2.id,
         player_name: PLAYER_2.name,
         score: 0,
-        game: 'whackamole'
+        game: '2d-car-racing'
       }
     );
+    
+    log(`✅ Successfully added ${PLAYER_2.name} to the match`);
     
     log('✅ Successfully added Player 2 to the match');
 
@@ -127,7 +149,7 @@ async function createMatch() {
     console.log('\n📋 Match Details:');
     console.log('----------------');
     console.log(`Match ID: ${matchId}`);
-    console.log(`Game: Whack-A-Mole`);
+    console.log(`Game: 2D Car Racing`);
     console.log(`Status: Active`);
     
     console.log('\n👥 Players:');
@@ -140,7 +162,11 @@ async function createMatch() {
     console.log(`\nPlayer 2 (${PLAYER_2.name}):`);
     console.log(`  ${player2Url}`);
     
-    console.log('\n✅ Match created and players added successfully!');
+    console.log(`\n✅ Match created and players added successfully!`);
+    
+    // Open Player 1's game in the default browser
+    console.log(`\n🌐 Opening game in browser for ${PLAYER_1.name}...`);
+    await openBrowser(player1Url);
     
   } catch (error) {
     logError('Failed to create match', error);
