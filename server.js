@@ -9,6 +9,7 @@ import { connectCloudinary } from './config/Cloudinary.js';
 import postRoutes from './routes/postRoute.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
+import userRoutes from './routes/userRoutes.js';
 
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -29,7 +30,6 @@ dotenv.config();
     
     console.log('Initializing Cloudinary...');
     await connectCloudinary();
-    console.log('Cloudinary connected successfully');
   } catch (error) {
     console.error('Failed to initialize services:', error);
     process.exit(1);
@@ -50,6 +50,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // API Routes
+app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 
