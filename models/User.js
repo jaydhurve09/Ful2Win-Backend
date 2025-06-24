@@ -1,6 +1,5 @@
-// models/User.js
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
   fullName: {
@@ -19,10 +18,23 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
-  Balance: {
+  profilePicture: {
+    type: String,
+    default: '' // Replace with your default image URL
+  },
+  Cash: {
     type: Number,
     default: 0
   },
+  Coin:{
+    type: Number,
+    default: 0
+  },
+  gamesWon: {
+  type: Number,
+  default: 0
+},
+
   followers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -34,13 +46,6 @@ const userSchema = new mongoose.Schema({
     default: []
   }]
 });
+const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 
-// Hash password before saving
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-module.exports = mongoose.model('User', userSchema);
+export default UserModel;

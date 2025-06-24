@@ -5,7 +5,8 @@ import connectCloudinary from './config/Cloudinary.js'; // Assuming you have a C
 const PORT = process.env.PORT || 5000;
 const app = express();
 import connectDB from './config/mongodb.js'; // Assuming you have a db.js file for database connection
-import postRouter from './routes/postRoute.js'; // Assuming you have a postRouter defined in routes/postRoute.js
+import postRouter from './routes/postRouter.js'; // Assuming you have a postRouter defined in routes/postRoute.js
+import userRouter from './routes/userRouter.js'; // Assuming you have a userRouter defined in routes/userRoute.js
 
 // Middleware
 app.use(cors());
@@ -17,6 +18,8 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Ful2Win Backend API' });
 });
 
+
+app.use('/user', userRouter); // Assuming you have a userRouter defined in routes/userRoute.js
 // Set port
 app.use('/post', postRouter); // Assuming you have a postRouter defined in routes/postRoute.js
 
