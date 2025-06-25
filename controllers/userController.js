@@ -11,14 +11,32 @@ import mongoose from 'mongoose';
 // @access  Public
 const registerUser = async (req, res) => {
   try {
+    console.log('=== Register User Request ===');
+    console.log('Request body:', req.body);
+    
     const { fullName, phoneNumber, password } = req.body;
 
-    // Check if user already exists
-    const userExists = await User.findOne({ phoneNumber });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists with this phone number' });
+    if (!fullName || !phoneNumber || !password) {
+      console.log('Missing required fields');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide all required fields',
+        required: ['fullName', 'phoneNumber', 'password']
+      });
     }
 
+    // Check if user already exists
+    console.log('Checking if user exists with phone:', phoneNumber);
+    const userExists = await User.findOne({ phoneNumber });
+    if (userExists) {
+      console.log('User already exists with phone:', phoneNumber);
+      return res.status(400).json({ 
+        success: false,
+        message: 'User already exists with this phone number' 
+      });
+    }
+
+    console.log('Creating new user...');
     // Create new user
     const user = await User.create({
       fullName,
@@ -29,8 +47,19 @@ const registerUser = async (req, res) => {
       following: []
     });
 
+    console.log('User created successfully:', {
+      _id: user._id,
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber
+    });
+
+    // Verify the user was saved to the database
+    const savedUser = await User.findById(user._id);
+    console.log('User retrieved from database:', savedUser ? 'Found' : 'Not found');
+
     // Return user data (excluding password)
     res.status(201).json({
+      success: true,
       _id: user._id,
       fullName: user.fullName,
       phoneNumber: user.phoneNumber,
@@ -38,7 +67,12 @@ const registerUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Error registering user:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 
@@ -46,27 +80,38 @@ const registerUser = async (req, res) => {
 // @route   POST /api/users/login
 // @access  Public
 const loginUser = async (req, res) => {
-  console.log('Login request received:', {
-    body: req.body,
-    headers: req.headers,
-    timestamp: new Date().toISOString()
-  });
-  
   try {
-    // Check if body exists and is an object
-    if (!req.body || typeof req.body !== 'object' || Object.keys(req.body).length === 0) {
-      const error = new Error('Invalid request body');
-      error.status = 400;
-      throw error;
+    console.log('\n=== Login Request ===');
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    
+    // Log request headers and body for debugging
+    console.log('Headers:', req.headers);
+    console.log('Raw body:', req.body);
+    
+    let requestBody = req.body;
+    
+    // If body is a string, try to parse it as JSON
+    if (typeof req.body === 'string' || req.body === undefined) {
+      try {
+        requestBody = JSON.parse(req.body || '{}');
+      } catch (error) {
+        console.error('Error parsing JSON body:', error);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid JSON in request body'
+        });
+      }
     }
-
-    const { phoneNumber, password } = req.body;
-    console.log('Login attempt for phone number:', phoneNumber);
-
+    
+    const { phoneNumber, password } = requestBody;
+    
     // Input validation
     if (!phoneNumber || !password) {
-      console.log('Missing required fields:', { phoneNumber: !!phoneNumber, password: '***' });
-      console.error('Missing required fields:', { phoneNumber: !!phoneNumber, password: !!password });
+      console.log('Missing required fields:', { 
+        phoneNumber: !!phoneNumber, 
+        password: '***' 
+      });
+      
       return res.status(400).json({ 
         success: false,
         message: 'Please provide both phone number and password',
@@ -80,74 +125,60 @@ const loginUser = async (req, res) => {
     // Phone number format validation
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(phoneNumber)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Please provide a valid 10-digit phone number' 
+        message: 'Please enter a valid 10-digit phone number'
       });
     }
 
     // Find user
-    console.log('Looking up user in database...');
+    console.log('Looking up user in database with phone number:', phoneNumber);
     const user = await User.findOne({ phoneNumber }).select('+password');
+    
     if (!user) {
       console.log('User not found for phone number:', phoneNumber);
       return res.status(401).json({ 
         success: false,
-        message: 'Invalid credentials' 
+        message: 'Invalid credentials'
       });
     }
 
     // Check password
     console.log('User found, checking password...');
     const isMatch = await user.matchPassword(password);
+    
     if (!isMatch) {
       console.log('Invalid password for user:', phoneNumber);
       return res.status(401).json({ 
         success: false,
-        message: 'Invalid credentials' 
+        message: 'Invalid credentials'
       });
     }
 
     // Generate JWT token
-    console.log('Generating JWT token...');
     const token = user.getSignedJwtToken();
-    console.log('JWT token generated successfully');
-    
-    // Log welcome message
-    console.log(`User logged in: Welcome ${user.fullName}! (ID: ${user._id})`);
-    console.log('Sending success response...');
-    
-    // Set token in HTTP-only cookie
+
+    // Set JWT token in HTTP-only cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
-    
-    // Return user data and token (excluding password)
+
+    // Remove password from output
+    user.password = undefined;
+
     res.status(200).json({
       success: true,
-      token: token, // Also send token in response for clients that can't use httpOnly cookies
-      data: {
-        _id: user._id,
-        fullName: user.fullName,
-        phoneNumber: user.phoneNumber,
-        balance: user.Balance,
-        isAdmin: user.isAdmin
-      }
-    });
-
-  } catch (error) {
-    console.error('Login error:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      status: error.status,
-      timestamp: new Date().toISOString()
+      token,
+      data: user
     });
     
-    const statusCode = error.status || 500;
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    const statusCode = error.statusCode || 500;
     const response = {
       success: false,
       message: error.message || 'Server error during login',
@@ -157,7 +188,7 @@ const loginUser = async (req, res) => {
         name: error.name
       })
     };
-
+    
     res.status(statusCode).json(response);
   }
 };
@@ -232,12 +263,25 @@ const updateUserProfile = async (req, res) => {
   console.log('Update profile request received:', {
     params: req.params,
     body: req.body,
-    file: req.file
+    file: req.file,
+    files: req.files,
+    headers: req.headers
   });
 
   try {
     const userId = req.params.userId;
-    let updates = { ...req.body };
+    
+    // Check if user exists and is authorized
+    const currentUser = await User.findById(userId).select('-password -__v -refreshToken');
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Initialize updates object
+    const updates = { ...req.body };
     
     // List of allowed fields that can be updated
     const allowedUpdates = [
@@ -248,8 +292,17 @@ const updateUserProfile = async (req, res) => {
     // Filter only allowed updates
     const updatesToApply = {};
     Object.keys(updates).forEach(key => {
-      if (allowedUpdates.includes(key) && updates[key] !== undefined) {
-        updatesToApply[key] = updates[key];
+      if (allowedUpdates.includes(key) && updates[key] !== undefined && updates[key] !== '') {
+        // Handle date fields
+        if (key === 'dateOfBirth' && updates[key]) {
+          try {
+            updatesToApply[key] = new Date(updates[key]);
+          } catch (e) {
+            console.error('Error parsing date:', e);
+          }
+        } else {
+          updatesToApply[key] = updates[key];
+        }
       }
     });
 
@@ -261,17 +314,22 @@ const updateUserProfile = async (req, res) => {
           folder: "profiles",
           use_filename: true,
           unique_filename: true,
-          resource_type: 'auto'
+          resource_type: 'auto',
+          transformation: [
+            { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
+            { quality: 'auto:good' }
+          ]
         });
         
         console.log('Cloudinary upload result:', result);
         updatesToApply.profilePicture = result.secure_url;
         
         // If there's an old profile picture, delete it from Cloudinary
-        if (updates.oldProfilePicture) {
+        if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary')) {
           try {
-            const publicId = updates.oldProfilePicture.split('/').pop().split('.')[0];
+            const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
             await cloudinary.uploader.destroy(`profiles/${publicId}`);
+            console.log('Old profile picture deleted from Cloudinary');
           } catch (cloudErr) {
             console.error('Error deleting old profile picture:', cloudErr);
             // Don't fail the request if deletion of old image fails
@@ -285,36 +343,63 @@ const updateUserProfile = async (req, res) => {
           error: uploadError.message 
         });
       }
-    }
-
-    // If profile picture is being removed
-    if (updates.profilePicture === '') {
+    } else if (updates.profilePicture === '') {
+      // If profile picture is being removed
       updatesToApply.profilePicture = '';
-      // Optionally delete from Cloudinary if needed
+      
+      // Delete old profile picture from Cloudinary if it exists
+      if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary')) {
+        try {
+          const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`profiles/${publicId}`);
+          console.log('Profile picture removed from Cloudinary');
+        } catch (cloudErr) {
+          console.error('Error removing profile picture:', cloudErr);
+          // Continue even if deletion fails
+        }
+      }
     }
 
     console.log('Applying updates to user:', updatesToApply);
     
+    // If no updates to apply, return current user
+    if (Object.keys(updatesToApply).length === 0) {
+      return res.json({
+        success: true,
+        message: 'No changes detected',
+        user: currentUser
+      });
+    }
+    
     // Find and update the user
-    const user = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updatesToApply },
       { new: true, runValidators: true }
     ).select('-password -__v -refreshToken');
 
-    if (!user) {
+    if (!updatedUser) {
       return res.status(404).json({ 
         success: false, 
-        message: 'User not found' 
+        message: 'User not found or update failed' 
       });
     }
 
-    console.log('User profile updated successfully:', user);
-    res.json({
+    console.log('User profile updated successfully:', updatedUser);
+    
+    // Prepare response
+    const response = {
       success: true,
       message: 'Profile updated successfully',
-      user
-    });
+      user: updatedUser.toObject()
+    };
+    
+    // If profile picture was updated, include the new URL
+    if (updatesToApply.profilePicture !== undefined) {
+      response.profilePicture = updatedUser.profilePicture;
+    }
+    
+    res.json(response);
   } catch (error) {
     console.error('Error updating user profile:', {
       error: error.message,
@@ -416,15 +501,30 @@ const getUserPosts = async (req, res) => {
   }
 };
 
-// @desc    Logout user / clear cookie
+// @desc    Logout user / clear token
 // @route   POST /api/users/logout
 // @access  Private
-const logoutUser = (req, res) => {
-  res.cookie('jwt', '', {
-    httpOnly: true,
-    expires: new Date(0)
-  });
-  res.status(200).json({ message: 'Logged out successfully' });
+const logoutUser = async (req, res) => {
+  try {
+    // Clear any existing cookies
+    res.clearCookie('jwt');
+    
+    // If using token in Authorization header, we can't directly invalidate it
+    // But we can send instructions to the client to clear their token
+    // In a production app, you might want to implement a token blacklist here
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'Logged out successfully' 
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error during logout',
+      error: error.message
+    });
+  }
 };
 
 export { 

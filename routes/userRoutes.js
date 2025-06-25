@@ -20,6 +20,22 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
 
+// Test endpoint to check request body parsing
+router.post('/test-body', (req, res) => {
+  console.log('=== Test Body Endpoint ===');
+  console.log('Headers:', req.headers);
+  console.log('Raw body:', req.body);
+  console.log('Body type:', typeof req.body);
+  
+  res.json({
+    success: true,
+    headers: req.headers,
+    body: req.body,
+    bodyType: typeof req.body,
+    rawHeaders: req.rawHeaders
+  });
+});
+
 // Temporary route to check user existence (remove in production)
 router.get('/check-user/:phoneNumber', async (req, res) => {
   try {

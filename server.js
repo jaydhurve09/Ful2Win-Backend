@@ -44,10 +44,101 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Basic middleware
+// Enable CORS first
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Body parsing middleware - must come before any route that needs to read the body
+app.use(express.json({ 
+  limit: '50mb',
+  strict: false, // Allow any JSON value
+  type: ['application/json', 'application/*+json', 'text/plain'] // Handle various content types
+}));
+
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '50mb',
+  type: ['application/x-www-form-urlencoded']
+}));
+
+// Raw body parser for text/plain
+app.use((req, res, next) => {
+  if (req.is('text/*')) {
+    let data = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => { data += chunk; });
+    req.on('end', () => {
+      try {
+        req.body = data ? JSON.parse(data) : {};
+        next();
+      } catch (e) {
+        req.body = data;
+        next();
+      }
+    });
+  } else {
+    next();
+  }
+});
+
+// Request logging middleware - after body parsers
+app.use((req, res, next) => {
+  const requestId = Date.now();
+  
+  console.log(`\n=== ${req.method} ${req.originalUrl} [${requestId}] ===`);
+  console.log(`[${new Date().toISOString()}]`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  
+  // Log request body if it exists
+  if (req.body) {
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Raw request body:', req.body);
+    console.log('Request body type:', typeof req.body);
+  } else {
+    console.log('No request body');
+  }
+  
+  // Log parsed cookies
+  console.log('Cookies:', req.cookies);
+  
+  // Log raw headers for debugging
+  console.log('Raw headers:');
+  console.log(req.rawHeaders);
+  
+  // Store the original send method
+  const originalSend = res.send;
+  
+  // Override the send method to log the response
+  res.send = function(body) {
+    console.log(`\n=== Response [${requestId}] ===`);
+    console.log(`Status: ${res.statusCode}`);
+    console.log('Response body:', body);
+    return originalSend.call(this, body);
+  };
+  
+  // Store the original json method
+  const originalJson = res.json;
+  
+  // Override the json method to log the response
+  res.json = function(body) {
+    console.log('Response:', JSON.stringify(body, null, 2));
+    return originalJson.call(this, body);
+  };
+  
+  next();
+});
+
+// Error handling for JSON parsing - must be after body parsers
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    console.error('JSON parsing error:', err);
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid JSON in request body',
+      error: err.message
+    });
+  }
+  next(err);
+});
 
 // API Routes
 app.use('/api/users', userRoutes);
@@ -178,6 +269,7 @@ app.get('/api/test', (req, res) => {
 // API Routes - This comes AFTER fileUpload middleware
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/users', userRoutes);
 
 //Serve static game files
 app.use('/games', express.static(path.join(__dirname, 'games')));

@@ -117,10 +117,50 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+  console.log('=== User Pre-Save Hook ===');
+  console.log('Document being saved:', {
+    _id: this._id,
+    fullName: this.fullName,
+    phoneNumber: this.phoneNumber,
+    isNew: this.isNew,
+    modifiedPaths: this.modifiedPaths()
+  });
+
+  if (!this.isModified('password')) {
+    console.log('Password not modified, skipping hashing');
+    return next();
+  }
+  
+  try {
+    console.log('Hashing password...');
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    console.log('Password hashed successfully');
+    next();
+  } catch (error) {
+    console.error('Error hashing password:', error);
+    next(error);
+  }
+});
+
+// Add post-save hook
+userSchema.post('save', function(doc) {
+  console.log('=== User Post-Save Hook ===');
+  console.log('Document saved successfully:', {
+    _id: doc._id,
+    fullName: doc.fullName,
+    phoneNumber: doc.phoneNumber
+  });
+});
+
+// Add post-init hook to log when documents are loaded
+userSchema.post('init', function(doc) {
+  console.log('=== User Post-Init Hook ===');
+  console.log('Document loaded from database:', {
+    _id: doc._id,
+    fullName: doc.fullName,
+    phoneNumber: doc.phoneNumber
+  });
 });
 
 // Method to compare password
