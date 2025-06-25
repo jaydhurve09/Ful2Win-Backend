@@ -46,7 +46,7 @@ const allowedOrigins = [
 
 // Add FRONTEND_URL if it exists
 if (process.env.FRONTEND_URL) {
-  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, ''); // Remove trailing slash
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
   }
@@ -67,9 +67,7 @@ const corsOptions = {
     });
     
     if (!isAllowed) {
-      console.log('CORS blocked for origin:', origin);
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}. Allowed origins: ${allowedOrigins.join(', ')}`;
-      return callback(new Error(msg), false);
+      return callback(new Error('Not allowed by CORS'), false);
     }
     
     return callback(null, true);
@@ -80,17 +78,11 @@ const corsOptions = {
     'Content-Type',
     'Authorization',
     'X-Requested-With',
-    'X-Test-Request',
     'Accept',
-    'Origin',
-    'X-Requested-With',
-    'X-Auth-Token'
+    'Origin'
   ],
   exposedHeaders: [
     'Content-Length',
-    'X-Foo',
-    'X-Bar',
-    'Set-Cookie',
     'Authorization'
   ],
   maxAge: 86400, // 24 hours
@@ -179,63 +171,44 @@ app.use((req, res, next) => {
   }
 });
 
-// Simple request logging middleware
+// Request logging middleware (production-friendly)
 app.use((req, res, next) => {
-  const requestId = Math.random().toString(36).substring(2, 8);
   const start = Date.now();
-  
-  // Add request ID to the request object
+  const requestId = Math.random().toString(36).substring(2, 8);
   req.requestId = requestId;
-  
-  // Log basic request info
-  console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl}`);
-  
-  // Log only errors in response
-  const originalSend = res.send;
-  const originalJson = res.json;
-  
-  res.send = function(body) {
+
+  // Log only errors
+  res.on('finish', () => {
+    const duration = Date.now() - start;
     if (res.statusCode >= 400) {
-      console.error(`[${new Date().toISOString()}] [${requestId}] Error ${res.statusCode} - ${req.method} ${req.originalUrl} (${Date.now() - start}ms)`);
+      console.error(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
     }
-    return originalSend.call(this, body);
-  };
-  
-  res.json = function(body) {
-    if (res.statusCode >= 400) {
-      console.error(`[${new Date().toISOString()}] [${requestId}] Error ${res.statusCode} - ${req.method} ${req.originalUrl} (${Date.now() - start}ms)`);
-      console.error('Error details:', JSON.stringify(body, null, 2));
-    }
-    return originalJson.call(this, body);
-  };
-  
+  });
+
   next();
 });
 
-// Test endpoint - must be before error handling
-app.post('/api/users/test-endpoint', (req, res) => {
-  console.log('=== Test Endpoint Hit ===');
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  
-  res.json({
-    success: true,
-    message: 'Test endpoint is working',
-    method: req.method,
-    path: req.path,
-    body: req.body,
-    headers: req.headers
+// Test endpoint - only in development
+if (process.env.NODE_ENV === 'development') {
+  app.post('/api/users/test-endpoint', (req, res) => {
+    res.json({
+      success: true,
+      message: 'Test endpoint is working',
+      method: req.method,
+      path: req.path
+    });
   });
-});
+}
 
-// Error handling for JSON parsing - must be after body parsers but before other routes
+// Error handling for JSON parsing
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && 'body' in err) {
-    console.error('JSON parsing error:', err);
     return res.status(400).json({
       success: false,
       message: 'Invalid JSON in request body',
-      error: err.message
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Bad request'
     });
   }
   next(err);

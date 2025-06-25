@@ -33,74 +33,43 @@ const testToken = (req, res) => {
  * Middleware to protect routes - verifies JWT token
  */
 const protect = async (req, res, next) => {
-  console.log('\n=== New Request ===');
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     // Get token from header
     token = req.headers.authorization.split(' ')[1];
-    
-    console.log('🔑 Token received (first 15 chars):', token ? `${token.substring(0, 15)}...` : 'No token');
-    console.log('Request Headers:', {
-      'content-type': req.headers['content-type'],
-      'user-agent': req.headers['user-agent'],
-      'authorization': 'Bearer [TOKEN]',
-      'x-requested-with': req.headers['x-requested-with']
-    });
 
     try {
       // Verify token
-      console.log('🔍 Verifying token...');
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      console.log('✅ Token verified successfully. Decoded:', {
-        userId: decoded.userId || decoded.id,
-        iat: new Date(decoded.iat * 1000).toISOString(),
-        exp: new Date(decoded.exp * 1000).toISOString(),
-        currentTime: new Date().toISOString()
-      });
 
       // Get user from the token
       const user = await User.findById(decoded.id).select('-password -refreshToken');
 
       if (!user) {
-        console.error('User not found for ID:', decoded.id);
-        return res.status(401).json({ error: 'User not found' });
+        return res.status(401).json({ 
+          success: false,
+          error: 'User not found' 
+        });
       }
-
-      console.log('User authenticated:', {
-        userId: user._id,
-        phoneNumber: user.phoneNumber,
-        fullName: user.fullName
-      });
 
       req.user = user;
       next();
     } catch (error) {
-      console.error('Token verification failed:', {
-        name: error.name,
-        message: error.message,
-        expiredAt: error.expiredAt || 'N/A',
-        date: new Date().toISOString(),
-        stack: error.stack
-      });
+      // Log error for server-side debugging
+      console.error('Auth Error:', error.name, error.message);
       
       return res.status(401).json({ 
         success: false,
         error: 'Not authorized, token failed',
         message: error.message,
-        expired: error.name === 'TokenExpiredError',
-        timestamp: new Date().toISOString()
+        expired: error.name === 'TokenExpiredError'
       });
     }
   } else {
-    console.error('No token provided in Authorization header');
     return res.status(401).json({ 
       success: false, 
-      error: 'Not authorized, no token',
-      headers: Object.keys(req.headers)
+      error: 'Not authorized, no token' 
     });
   }
 };
