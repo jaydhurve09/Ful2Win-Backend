@@ -10,7 +10,7 @@ import {
   getUserPosts
 } from '../controllers/userController.js';
 import { protect, admin, testToken } from '../middleware/authMiddleware.js';
-import { upload, handleMulterError } from '../middleware/uploadMiddleware.js';
+import { uploadSingle, handleMulterError } from '../middleware/uploadMiddleware.js';
 import User from '../models/User.js';
 
 const router = express.Router();
@@ -90,15 +90,7 @@ router.get('/profile/:userId', getUserProfile);
 router.put(
   '/profile/:userId', 
   protect, // Ensure user is authenticated
-  (req, res, next) => {
-    // Handle file upload first
-    upload(req, res, (err) => {
-      if (err) {
-        return handleMulterError(err, req, res, next);
-      }
-      next();
-    });
-  },
+  uploadSingle('profilePicture'),
   updateUserProfile
 );
 

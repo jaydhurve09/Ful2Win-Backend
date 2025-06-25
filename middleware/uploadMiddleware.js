@@ -112,7 +112,7 @@ const handleMulterError = (err, req, res, next) => {
   next();
 };
 
-// Initialize upload with enhanced configuration
+// Initialize multer with configuration
 const upload = multer({
   storage: storage,
   limits: { 
@@ -123,16 +123,19 @@ const upload = multer({
   },
   fileFilter: fileFilter,
   preservePath: false // Don't include full path in the filename
-}).single('profilePicture');
+});
 
-// Wrapper function to handle errors properly
-const uploadFile = (req, res, next) => {
-  upload(req, res, (err) => {
-    if (err) {
-      return handleMulterError(err, req, res, next);
-    }
-    next();
-  });
+// Middleware for handling single file upload
+export const uploadSingle = (fieldName) => {
+  return (req, res, next) => {
+    const uploadSingle = upload.single(fieldName);
+    uploadSingle(req, res, (err) => {
+      if (err) {
+        return handleMulterError(err, req, res, next);
+      }
+      next();
+    });
+  };
 };
 
-export { uploadFile as upload, handleMulterError };
+export { upload, handleMulterError };
