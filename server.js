@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
-import { connectCloudinary } from './config/Cloudinary.js';
+import { connectCloudinary } from './config/cloudinary.js';
 import postRoutes from './routes/postRoute.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
