@@ -1,17 +1,26 @@
-const express = require('express');
+import express from 'express';
+import { protect, admin, ownerOrAdmin } from '../middleware/authMiddleware.js';
+import { upload as uploadPostMedia, handleMulterError } from '../middleware/uploadMiddleware.js';
+import Post from '../models/Post.js';
+
 const router = express.Router();
-const postController = require('../controllers/postController');
-const { protect, admin, ownerOrAdmin } = require('../middleware/authMiddleware');
-const { uploadPostMedia } = require('../middleware/uploadMiddleware');
+
+// Import the postController methods
+import * as postController from '../controllers/postController.js';
 
 // Create a new post with media upload
 router.post(
   '/',
   protect,
-  uploadPostMedia.fields([
-    { name: 'images', maxCount: 10 },
-    { name: 'videos', maxCount: 5 }
-  ]),
+  (req, res, next) => {
+    // Use the upload middleware
+    uploadPostMedia(req, res, (err) => {
+      if (err) {
+        return handleMulterError(err, req, res, next);
+      }
+      next();
+    });
+  },
   postController.createPost
 );
 
@@ -25,16 +34,66 @@ router.get('/:id', protect, postController.getPostById);
 router.put(
   '/:id',
   protect,
-  ownerOrAdmin(Post, 'author'),
-  uploadPostMedia.fields([
-    { name: 'images', maxCount: 10 },
-    { name: 'videos', maxCount: 5 }
-  ]),
+  (req, res, next) => {
+    // First verify the post exists and user is the author or admin
+    Post.findById(req.params.id)
+      .then(post => {
+        if (!post) {
+          return res.status(404).json({ message: 'Post not found' });
+        }
+        
+        // Check if user is the author or admin
+        if (post.author.toString() !== req.user.id && !req.user.isAdmin) {
+          return res.status(403).json({ 
+            message: 'Not authorized to update this post' 
+          });
+        }
+        
+        // Add the post to the request object for use in the controller
+        req.post = post;
+        next();
+      })
+      .catch(next);
+  },
+  (req, res, next) => {
+    // Use the upload middleware
+    uploadPostMedia(req, res, (err) => {
+      if (err) {
+        return handleMulterError(err, req, res, next);
+      }
+      next();
+    });
+  },
   postController.updatePost
 );
 
 // Delete a post
-router.delete('/:id', protect, ownerOrAdmin(Post, 'author'), postController.deletePost);
+router.delete(
+  '/:id', 
+  protect,
+  (req, res, next) => {
+    // First verify the post exists and user is the author or admin
+    Post.findById(req.params.id)
+      .then(post => {
+        if (!post) {
+          return res.status(404).json({ message: 'Post not found' });
+        }
+        
+        // Check if user is the author or admin
+        if (post.author.toString() !== req.user.id && !req.user.isAdmin) {
+          return res.status(403).json({ 
+            message: 'Not authorized to delete this post' 
+          });
+        }
+        
+        // Add the post to the request object for use in the controller
+        req.post = post;
+        next();
+      })
+      .catch(next);
+  },
+  postController.deletePost
+);
 
 // Like/Unlike a post
 router.post('/:id/like', protect, postController.likePost);
@@ -55,7 +114,24 @@ router.post('/:id/comments', protect, postController.addComment);
 router.put(
   '/:id/comments/:commentId',
   protect,
-  ownerOrAdmin(Comment, 'author'),
+  (req, res, next) => {
+    // Find the comment and check ownership
+    Post.findOne(
+      { 'comments._id': req.params.commentId },
+      { 'comments.$': 1 }
+    )
+    .then(post => {
+      if (!post) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+      const comment = post.comments[0];
+      if (comment.author.toString() !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized to update this comment' });
+      }
+      next();
+    })
+    .catch(next);
+  },
   postController.updateComment
 );
 
@@ -63,7 +139,24 @@ router.put(
 router.delete(
   '/:id/comments/:commentId',
   protect,
-  ownerOrAdmin(Comment, 'author'),
+  (req, res, next) => {
+    // Find the comment and check ownership
+    Post.findOne(
+      { 'comments._id': req.params.commentId },
+      { 'comments.$': 1 }
+    )
+    .then(post => {
+      if (!post) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+      const comment = post.comments[0];
+      if (comment.author.toString() !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized to delete this comment' });
+      }
+      next();
+    })
+    .catch(next);
+  },
   postController.deleteComment
 );
 
@@ -89,4 +182,4 @@ router.get('/tag/:tag', protect, postController.getPostsByTag);
 router.get('/admin/pending', protect, admin, postController.getPendingPosts);
 router.put('/admin/:id/status', protect, admin, postController.updatePostStatus);
 
-module.exports = router;
+export default router;

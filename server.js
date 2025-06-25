@@ -7,7 +7,7 @@ import fileUpload from 'express-fileupload';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
-import postRoutes from './routes/postRoute.js';
+import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 import userRoutes from './routes/userRoutes.js';
@@ -96,47 +96,33 @@ app.use((req, res, next) => {
   }
 });
 
-// Request logging middleware - after body parsers
+// Simple request logging middleware
 app.use((req, res, next) => {
-  const requestId = Date.now();
+  const requestId = Math.random().toString(36).substring(2, 8);
+  const start = Date.now();
   
-  console.log(`\n=== ${req.method} ${req.originalUrl} [${requestId}] ===`);
-  console.log(`[${new Date().toISOString()}]`);
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  // Add request ID to the request object
+  req.requestId = requestId;
   
-  // Log request body if it exists
-  if (req.body) {
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('Raw request body:', req.body);
-    console.log('Request body type:', typeof req.body);
-  } else {
-    console.log('No request body');
-  }
+  // Log basic request info
+  console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl}`);
   
-  // Log parsed cookies
-  console.log('Cookies:', req.cookies);
-  
-  // Log raw headers for debugging
-  console.log('Raw headers:');
-  console.log(req.rawHeaders);
-  
-  // Store the original send method
+  // Log only errors in response
   const originalSend = res.send;
+  const originalJson = res.json;
   
-  // Override the send method to log the response
   res.send = function(body) {
-    console.log(`\n=== Response [${requestId}] ===`);
-    console.log(`Status: ${res.statusCode}`);
-    console.log('Response body:', body);
+    if (res.statusCode >= 400) {
+      console.error(`[${new Date().toISOString()}] [${requestId}] Error ${res.statusCode} - ${req.method} ${req.originalUrl} (${Date.now() - start}ms)`);
+    }
     return originalSend.call(this, body);
   };
   
-  // Store the original json method
-  const originalJson = res.json;
-  
-  // Override the json method to log the response
   res.json = function(body) {
-    console.log('Response:', JSON.stringify(body, null, 2));
+    if (res.statusCode >= 400) {
+      console.error(`[${new Date().toISOString()}] [${requestId}] Error ${res.statusCode} - ${req.method} ${req.originalUrl} (${Date.now() - start}ms)`);
+      console.error('Error details:', JSON.stringify(body, null, 2));
+    }
     return originalJson.call(this, body);
   };
   

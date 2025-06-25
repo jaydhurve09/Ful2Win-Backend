@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import Post from '../models/Post.js';
+import User from '../models/User.js';
 
 /**
  * @desc    Create a new post
@@ -600,6 +601,245 @@ const commentOnPost = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 }
-//
-//exportmodels
-export { createPost, updatePost, deletePost, likePost, unlikePost, commentOnPost };
+// Export all controller methods
+export {
+  createPost,
+  updatePost,
+  deletePost,
+  likePost,
+  unlikePost,
+  commentOnPost,
+  // Add other methods that are used in routes
+  getPosts,
+  getPostById,
+  getPostsByUser,
+  getSavedPosts,
+  getTrendingPosts,
+  getPostsByTag,
+  addComment,
+  updateComment,
+  deleteComment,
+  likeComment,
+  replyToComment,
+  toggleSavePost,
+  reportPost,
+  getPostComments,
+  getPendingPosts,
+  updatePostStatus
+};
+
+// Stub implementations for methods that are used in routes but not yet implemented
+const getPosts = async (req, res) => {
+  try {
+    const posts = await Post.find({}).sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getPostById = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    res.json(post);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getPostsByUser = async (req, res) => {
+  try {
+    const posts = await Post.find({ 'author': req.params.userId });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getSavedPosts = async (req, res) => {
+  try {
+    // First verify the user exists
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if user has the savedPosts field
+    if (user.savedPosts === undefined) {
+      // If the field doesn't exist, return empty array
+      return res.json([]);
+    }
+    
+    // If user has saved posts, return them
+    if (user.savedPosts && user.savedPosts.length > 0) {
+      const posts = await Post.find({ _id: { $in: user.savedPosts } });
+      return res.json(posts);
+    }
+    
+    // If savedPosts exists but is empty, return empty array
+    res.json([]);
+  } catch (error) {
+    console.error('Error fetching saved posts:', error);
+    res.status(500).json({ 
+      message: 'Error fetching saved posts',
+      error: error.message 
+    });
+  }
+};
+
+const getTrendingPosts = async (req, res) => {
+  try {
+    const posts = await Post.find({}).sort({ likes: -1 }).limit(10);
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getPostsByTag = async (req, res) => {
+  try {
+    const posts = await Post.find({ tags: req.params.tag });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * @desc    Get all comments for a post
+ * @route   GET /api/posts/:id/comments
+ * @access  Private
+ */
+const getPostComments = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .select('comments')
+      .populate('comments.author', 'username profilePicture')
+      .sort({ 'comments.createdAt': -1 });
+
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    res.json(post.comments);
+  } catch (error) {
+    console.error('Error getting post comments:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * @desc    Get all pending posts (admin only)
+ * @route   GET /api/posts/admin/pending
+ * @access  Private/Admin
+ */
+const getPendingPosts = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { status: 'pending' };
+
+    const [posts, total] = await Promise.all([
+      Post.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('author', 'username profilePicture')
+        .lean(),
+      Post.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      count: posts.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: posts
+    });
+  } catch (error) {
+    console.error('Error getting pending posts:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error',
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * @desc    Update post status (admin only)
+ * @route   PUT /api/posts/admin/:id/status
+ * @access  Private/Admin
+ */
+const updatePostStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const { id } = req.params;
+
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be one of: pending, approved, rejected'
+      });
+    }
+
+    const post = await Post.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    );
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Post ${status} successfully`,
+      data: post
+    });
+  } catch (error) {
+    console.error('Error updating post status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+const replyToComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+    const post = await Post.findById(req.params.id);
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    comment.replies.push({
+      text,
+      author: req.user.id,
+      createdAt: new Date()
+    });
+    
+    await post.save();
+    res.json({ message: 'Reply added successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
