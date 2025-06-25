@@ -1,3 +1,4 @@
+import fs from 'fs';
 import User from '../models/User.js';
 import Post from '../models/Post.js';
 import { v2 as cloudinary } from 'cloudinary';
@@ -260,12 +261,26 @@ const getCurrentUserProfile = async (req, res) => {
 // @route   PUT /api/users/profile/:userId
 // @access  Private
 const updateUserProfile = async (req, res) => {
-  console.log('Update profile request received:', {
-    params: req.params,
-    body: req.body,
-    file: req.file,
-    files: req.files,
-    headers: req.headers
+  console.log('=== Update Profile Request ===');
+  console.log('Params:', req.params);
+  console.log('Headers:', req.headers);
+  console.log('Files:', {
+    file: req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer',
+      encoding: req.file.encoding
+    } : 'No file',
+    files: req.files || 'No files'
+  });
+  
+  // Log Cloudinary config (without sensitive data)
+  console.log('Cloudinary config:', {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'set' : 'not set',
+    api_key: process.env.CLOUDINARY_API_KEY ? 'set' : 'not set',
+    api_secret: process.env.CLOUDINARY_API_SECRET ? 'set' : 'not set'
   });
 
   try {
@@ -341,6 +356,37 @@ const updateUserProfile = async (req, res) => {
     
     // Handle profile picture upload if a new file is provided
     if (req.file) {
+      // Ensure we have a buffer to work with
+      if (!req.file.buffer) {
+        console.error('No file buffer found. File might be too large or not properly processed.');
+        console.error('File object:', {
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer'
+        });
+        
+        // Check if we can access the file data another way
+        if (req.file.path) {
+          console.log('File path available, trying to read file directly...');
+          try {
+            const fileData = fs.readFileSync(req.file.path);
+            req.file.buffer = fileData;
+            console.log(`Successfully read ${fileData.length} bytes from file path`);
+          } catch (readError) {
+            console.error('Error reading file from path:', readError);
+          }
+        }
+        
+        if (!req.file.buffer) {
+          return res.status(400).json({
+            success: false,
+            message: 'File upload failed: Could not process the file. Please try again with a different file.',
+            details: 'No file buffer available',
+            code: 'FILE_PROCESSING_ERROR'
+          });
+        }
+      }
       try {
         console.log('Processing new profile picture upload...', {
           originalname: req.file.originalname,
@@ -372,8 +418,27 @@ const updateUserProfile = async (req, res) => {
         }
         
         // Convert buffer to base64 for Cloudinary
-        const base64Data = req.file.buffer.toString('base64');
-        const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
+        let base64Data;
+        try {
+          console.log('Converting file buffer to base64...');
+          base64Data = req.file.buffer.toString('base64');
+          console.log('Base64 conversion successful, data length:', base64Data.length);
+          
+          // Validate base64 data
+          if (!base64Data || base64Data.length < 100) { // Arbitrary minimum length
+            throw new Error('Base64 data appears to be too short or invalid');
+          }
+          
+          const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
+          console.log('Data URI created, length:', dataUri.length);
+        } catch (conversionError) {
+          console.error('Error converting file to base64:', {
+            error: conversionError.message,
+            bufferLength: req.file.buffer?.length,
+            mimetype: req.file.mimetype
+          });
+          throw new Error(`Failed to process file: ${conversionError.message}`);
+        }
         
         console.log('Uploading to Cloudinary...');
         
