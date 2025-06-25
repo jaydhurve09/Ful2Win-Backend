@@ -289,28 +289,49 @@ const updateUserProfile = async (req, res) => {
       'dateOfBirth', 'gender', 'country', 'profilePicture'
     ];
     
-    // Filter only allowed updates
+    // Initialize updates object
     const updatesToApply = {};
-    Object.keys(updates).forEach(key => {
-      if (allowedUpdates.includes(key) && updates[key] !== undefined && updates[key] !== '') {
-        // Handle date fields
-        if (key === 'dateOfBirth' && updates[key]) {
-          try {
-            updatesToApply[key] = new Date(updates[key]);
-          } catch (e) {
-            console.error('Error parsing date:', e);
-          }
-        } else {
-          updatesToApply[key] = updates[key];
-        }
+    
+    // Add all allowed fields from req.body to updatesToApply
+    allowedUpdates.forEach(field => {
+      if (updates[field] !== undefined) {
+        updatesToApply[field] = updates[field];
       }
     });
-
-    // Handle profile picture upload if exists in the request
+    
+    console.log('Processing updates:', updatesToApply);
+    
+    // Handle empty profilePicture object
+    if (updates.profilePicture && 
+        typeof updates.profilePicture === 'object' && 
+        Object.keys(updates.profilePicture).length === 0) {
+      console.log('Empty profilePicture object received, removing it from updates');
+      delete updates.profilePicture;
+    }
+    
+    // Handle profile picture upload if a new file is provided
     if (req.file) {
       try {
-        console.log('Uploading profile picture to Cloudinary...');
-        const result = await cloudinary.uploader.upload(req.file.path, {
+        console.log('Processing new profile picture upload...');
+        
+        // Validate file
+        if (!req.file.buffer) {
+          throw new Error('File buffer is empty. The file might be corrupted or too large.');
+        }
+
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedMimeTypes.includes(req.file.mimetype)) {
+          throw new Error(`Unsupported file type: ${req.file.mimetype}. Please upload an image file (JPEG, PNG, GIF, or WebP).`);
+        }
+        
+        // Convert buffer to base64 for Cloudinary
+        const base64Data = req.file.buffer.toString('base64');
+        const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
+        
+        console.log('Uploading to Cloudinary...');
+        
+        // Upload to Cloudinary using base64
+        const result = await cloudinary.uploader.upload(dataUri, {
           folder: "profiles",
           use_filename: true,
           unique_filename: true,
@@ -321,11 +342,22 @@ const updateUserProfile = async (req, res) => {
           ]
         });
         
-        console.log('Cloudinary upload result:', result);
+        if (!result?.secure_url) {
+          throw new Error('Failed to upload image to Cloudinary: No URL returned');
+        }
+        
+        console.log('Cloudinary upload successful:', {
+          url: result.secure_url,
+          public_id: result.public_id,
+          format: result.format,
+          bytes: result.bytes
+        });
+        
+        // Set the new profile picture URL
         updatesToApply.profilePicture = result.secure_url;
         
-        // If there's an old profile picture, delete it from Cloudinary
-        if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary')) {
+        // Delete the old profile picture from Cloudinary if it exists
+        if (currentUser.profilePicture?.includes('cloudinary')) {
           try {
             const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
             await cloudinary.uploader.destroy(`profiles/${publicId}`);

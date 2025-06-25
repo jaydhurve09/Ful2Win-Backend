@@ -46,6 +46,10 @@ const userSchema = new mongoose.Schema({
     enum: ['male', 'female', 'other', 'prefer not to say'],
     default: 'prefer not to say'
   },
+  country: {
+    type: String,
+    default: ''
+  },
   balance: {
     type: Number,
     default: 0,

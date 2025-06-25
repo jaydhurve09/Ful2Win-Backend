@@ -112,17 +112,17 @@ const handleMulterError = (err, req, res, next) => {
   next();
 };
 
+// Initialize multer with memory storage for Cloudinary
+const memoryStorage = multer.memoryStorage();
+
 // Initialize multer with configuration
 const upload = multer({
-  storage: storage,
+  storage: memoryStorage, // Use memory storage for Cloudinary
   limits: { 
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1, // Limit number of files
-    fields: 10, // Limit number of non-file fields
-    parts: 20 // Limit total parts (files + fields)
+    files: 1
   },
-  fileFilter: fileFilter,
-  preservePath: false // Don't include full path in the filename
+  fileFilter: fileFilter
 });
 
 // Middleware for handling single file upload
