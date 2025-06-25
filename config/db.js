@@ -2,12 +2,21 @@ import mongoose from 'mongoose';
 
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/ful2win';
-    console.log('=== MongoDB Connection ===');
-    console.log('Connection URI:', mongoUri);
+    // Use MONGODB_URI from environment variables or fallback to local
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ful2win';
     
-    // Enable debug mode for mongoose
-    mongoose.set('debug', true);
+    // Don't log the full connection string for security
+    console.log('=== MongoDB Connection ===');
+    console.log('Connecting to MongoDB...');
+    
+    // Set mongoose options
+    const options = {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4, // Use IPv4, skip trying IPv6
+    };
     
     // Connection events
     mongoose.connection.on('connecting', () => {
@@ -19,7 +28,7 @@ const connectDB = async () => {
     });
 
     mongoose.connection.on('error', (err) => {
-      console.error('MongoDB: Connection error:', err);
+      console.error('MongoDB: Connection error:', err.message);
     });
 
     mongoose.connection.on('disconnected', () => {
@@ -27,27 +36,23 @@ const connectDB = async () => {
     });
 
     // Connect to MongoDB
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-    });
-
+    await mongoose.connect(mongoUri, options);
+    
     console.log('MongoDB: Connected to database:', mongoose.connection.name);
     
-    // Test the connection
-    const admin = new mongoose.mongo.Admin(mongoose.connection.db);
-    const serverStatus = await admin.serverStatus();
-    console.log('MongoDB Server Status:', {
-      version: serverStatus.version,
-      host: serverStatus.host,
-      uptime: serverStatus.uptime,
-      connections: serverStatus.connections
-    });
+    // Simple ping to verify connection
+    await mongoose.connection.db.admin().ping();
+    console.log('MongoDB: Pinged successfully');
+    
+    return mongoose.connection;
     
   } catch (error) {
     console.error('MongoDB: Connection failed:', error.message);
+    console.error('Error code:', error.codeName);
     console.error('Error stack:', error.stack);
+    
+    // Exit process with failure if we can't connect to DB
+    process.exit(1);
     process.exit(1);
   }
 };

@@ -4,12 +4,20 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
+import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/Cloudinary.js';
 import postRoutes from './routes/postRoute.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 import userRoutes from './routes/userRoutes.js';
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  process.exit(1);
+});
 
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -19,27 +27,19 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env.production' : '.env' });
 
-// Initialize database and cloud services
-(async () => {
-  try {
-    console.log('Initializing database connection...');
-    await connectDB();
-    console.log('Database connection established');
-    
-    console.log('Initializing Cloudinary...');
-    await connectCloudinary();
-  } catch (error) {
-    console.error('Failed to initialize services:', error);
-    process.exit(1);
-  }
-})();
+// Trust proxy for production
+app.set('trust proxy', 1);
+
+// Initialize services
+let server;
 
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:5173',  // Local development
-  'https://your-frontend-domain.com'  // Replace with your frontend domain
+  'https://your-frontend-domain.com',  // Replace with your frontend domain
+  'https://ful2win.onrender.com'     // Render frontend URL
 ];
 
 const corsOptions = {
@@ -324,64 +324,65 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Global error handler for unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Consider whether to exit the process here
-  // process.exit(1);
-});
+// Start the server
+const startServer = async () => {
+  try {
+    console.log('Initializing database connection...');
+    await connectDB();
+    console.log('Database connection established');
+    
+    console.log('Initializing Cloudinary...');
+    await connectCloudinary();
+    
+    // Start the server
+    const port = process.env.PORT || 10000;
+    const server = app.listen(port, () => {
+      console.log(`Server running on port ${port} in ${process.env.NODE_ENV} mode`);
+      console.log(`API URL: http://localhost:${port}`);
+    });
+    
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (err) => {
+      console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+      console.error(err.name, err.message);
+      server.close(() => {
+        process.exit(1);
+      });
+    });
+    
+    // Handle SIGTERM for graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+      server.close(() => {
+        console.log('💥 Process terminated!');
+        process.exit(0);
+      });
+    });
+    
+    // Handle server errors
+    server.on('error', (error) => {
+      if (error.syscall !== 'listen') {
+        throw error;
+      }
 
-// Global error handler for uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  // Consider whether to exit the process here
-  // process.exit(1);
-});
-
-// Set port - default to 5001 to avoid conflicts with other services
-const PORT = 5001; // Hardcoded to 5001 to avoid any environment variable issues
-
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`API URL: http://localhost:${PORT}`);
-});
-
-// Handle server errors
-server.on('error', (error) => {
-  if (error.syscall !== 'listen') {
-    throw error;
+      // Handle specific listen errors with friendly messages
+      switch (error.code) {
+        case 'EACCES':
+          console.error(`Port ${port} requires elevated privileges`);
+          process.exit(1);
+        case 'EADDRINUSE':
+          console.error(`Port ${port} is already in use`);
+          process.exit(1);
+        default:
+          throw error;
+      }
+    });
+    
+  } catch (error) {
+    console.error('Failed to initialize services:', error);
+    process.exit(1);
   }
+};
 
-  // Handle specific listen errors with friendly messages
-  switch (error.code) {
-    case 'EACCES':
-      console.error(`Port ${PORT} requires elevated privileges`);
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      console.error(`Port ${PORT} is already in use`);
-      process.exit(1);
-      break;
-    default:
-      throw error;
-  }
-});
-
-// Handle process termination
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
-  });
-});
+// Start the server
+startServer();
