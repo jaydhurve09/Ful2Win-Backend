@@ -35,13 +35,15 @@ app.set('trust proxy', 1);
 // Initialize services
 let server;
 
-// CORS configuration
+// Add your frontend URL to the allowed origins
 const allowedOrigins = [
-  'http://localhost:5173',  // Local development
-  'https://ful2win.onrender.com',     // Render frontend URL
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
+  'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
   'https://www.ful2win.com',
-  'https://ful2win.com'
+  'https://api.ful2win.com'
 ].filter(Boolean);
 
 // Add FRONTEND_URL if it exists
@@ -52,6 +54,7 @@ if (process.env.FRONTEND_URL) {
   }
 }
 
+// CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl requests, or server-side requests)
@@ -79,6 +82,12 @@ const corsOptions = {
     'Authorization',
     'X-Requested-With',
     'Accept',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Allow-Credentials',
+    'Accept',
     'Origin'
   ],
   exposedHeaders: [
@@ -102,38 +111,17 @@ app.get('/', (req, res) => {
 // Log CORS configuration
 console.log('CORS Allowed Origins:', allowedOrigins);
 
-// Add CORS headers middleware
+// Apply CORS to all routes
+app.options('*', cors(corsOptions)); // Enable preflight for all routes
+app.use(cors(corsOptions));
+
+// Add CORS headers to all responses
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Check if origin is in allowed origins
-  if (origin) {
-    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
-      return normalizedOrigin === normalizedAllowed;
-    });
-    
-    if (isAllowed) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Test-Request, Accept, Origin, X-Auth-Token');
-      res.header('Access-Control-Expose-Headers', 'Content-Length, X-Foo, X-Bar, Set-Cookie, Authorization');
-    }
-  }
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    console.log('Handling preflight request for:', req.headers.origin);
-    return res.status(204).end();
-  }
-  
+  res.header('Access-Control-Allow-Credentials', true);
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   next();
 });
-
-// Enable CORS for all routes
-app.use(cors(corsOptions));
 
 // Enable preflight for all routes
 app.options('*', cors(corsOptions));
@@ -190,17 +178,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Test endpoint - only in development
-if (process.env.NODE_ENV === 'development') {
-  app.post('/api/users/test-endpoint', (req, res) => {
-    res.json({
-      success: true,
-      message: 'Test endpoint is working',
-      method: req.method,
-      path: req.path
-    });
-  });
-}
 
 // Error handling for JSON parsing
 app.use((err, req, res, next) => {
