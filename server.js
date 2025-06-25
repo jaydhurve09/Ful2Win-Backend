@@ -7,10 +7,12 @@ const app = express();
 import connectDB from './config/mongodb.js'; // Assuming you have a db.js file for database connection
 import postRouter from './routes/postRouter.js'; // Assuming you have a postRouter defined in routes/postRoute.js
 import userRouter from './routes/userRouter.js'; // Assuming you have a userRouter defined in routes/userRoute.js
+import cookieParser from 'cookie-parser';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 connectDB(); // Connect to MongoDB
 connectCloudinary(); // Connect to Cloudinary
 // Basic route

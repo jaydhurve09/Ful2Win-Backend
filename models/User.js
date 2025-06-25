@@ -7,9 +7,13 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  email:{
+    type: String,
+    match: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  },
   phoneNumber: {
     type: String,
-    required: true,
+    require: true,
     unique: true,
     match: /^[0-9]{10}$/, // Adjust according to your region
   },

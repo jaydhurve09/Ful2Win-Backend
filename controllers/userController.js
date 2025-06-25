@@ -9,14 +9,15 @@ const createToken = (id) => {
 };
 // Register a new user
 const registerUser = async (req, res) => {
-  const { fullName, phoneNumber, password } = req.body;
-
+  const { name,phoneNumber, password } = req.body;
+ console.log(name,phoneNumber, password);
+    // Check if phone number is provided
     // Validate input
-    if (!fullName || !phoneNumber || !password) {
+    if (!name || !phoneNumber || !password) {
       return res.status(400).json({ message: 'All fields are required' });
     }
     // Validate phone number format (example: 10 digits)
-    if(!validator.isMobilePhone(phoneNumber)) {
+    if(!validator.isMobilePhone(phoneNumber, 'any', { strictMode: false })) {
       return res.status(400).json({ message: 'Invalid phone number format' });
     }
 
@@ -33,8 +34,8 @@ const registerUser = async (req, res) => {
 
     // Create user
     const newUser = new UserModel({
-      fullName,
-      phoneNumber,
+      fullName: name,
+      phoneNumber: phoneNumber,
       password: hashedPassword
     });
 
@@ -72,7 +73,7 @@ const loginUser = async (req, res) => {
   }
 };
 const getUserProfile = async (req, res) => {
-  const userId = req.body.userId;
+  const userId = req.user._id;
 
   try {
     // Find user by ID
@@ -97,7 +98,7 @@ const updateUserProfile = async (req, res) => {
 
     // Update user fields
     user.fullName = req.body.fullName || user.fullName;
-    user.phoneNumber = req.body.phoneNumber || user.phoneNumber;
+    user.email = req.body.email || user.email;
     user.Cash = req.body.Cash || user.Cash;
     user.Coin = req.body.Coin || user.Coin;
     
