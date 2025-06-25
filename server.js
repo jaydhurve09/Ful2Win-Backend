@@ -38,35 +38,64 @@ let server;
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:5173',  // Local development
-  process.env.FRONTEND_URL,  // Replace with your frontend domain
-  'https://ful2win.onrender.com/',     // Render frontend URL
-  'https://ful-2-win.vercel.app/'
-];
+  'https://ful2win.onrender.com',     // Render frontend URL
+  'https://ful-2-win.vercel.app',
+  'https://www.ful2win.com',
+  'https://ful2win.com'
+].filter(Boolean);
+
+// Add FRONTEND_URL if it exists
+if (process.env.FRONTEND_URL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, ''); // Remove trailing slash
+  if (!allowedOrigins.includes(frontendUrl)) {
+    allowedOrigins.push(frontendUrl);
+  }
+}
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl requests, or server-side requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    // Normalize the origin by removing trailing slash for consistent comparison
+    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+    
+    // Check if the normalized origin is in the allowed origins
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
+      return normalizedOrigin === normalizedAllowed;
+    });
+    
+    if (!isAllowed) {
+      console.log('CORS blocked for origin:', origin);
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}. Allowed origins: ${allowedOrigins.join(', ')}`;
       return callback(new Error(msg), false);
     }
+    
     return callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
-    'X-Test-Request'  // Add custom header
+    'X-Test-Request',
+    'Accept',
+    'Origin',
+    'X-Requested-With',
+    'X-Auth-Token'
   ],
   exposedHeaders: [
-    'Content-Length', 
-    'X-Foo', 
-    'X-Bar'
-  ]
+    'Content-Length',
+    'X-Foo',
+    'X-Bar',
+    'Set-Cookie',
+    'Authorization'
+  ],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 // Simple health check endpoint
@@ -78,9 +107,44 @@ app.get('/', (req, res) => {
   });
 });
 
-// Enable CORS
+// Log CORS configuration
+console.log('CORS Allowed Origins:', allowedOrigins);
+
+// Add CORS headers middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Check if origin is in allowed origins
+  if (origin) {
+    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
+      return normalizedOrigin === normalizedAllowed;
+    });
+    
+    if (isAllowed) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Test-Request, Accept, Origin, X-Auth-Token');
+      res.header('Access-Control-Expose-Headers', 'Content-Length, X-Foo, X-Bar, Set-Cookie, Authorization');
+    }
+  }
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('Handling preflight request for:', req.headers.origin);
+    return res.status(204).end();
+  }
+  
+  next();
+});
+
+// Enable CORS for all routes
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable preflight for all routes
+
+// Enable preflight for all routes
+app.options('*', cors(corsOptions));
 
 // Body parsing middleware - must come before any route that needs to read the body
 app.use(express.json({ 
