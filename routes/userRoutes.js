@@ -7,7 +7,8 @@ import {
   getCurrentUserProfile,
   updateUserProfile,
   getUsers,
-  getUserPosts
+  getUserPosts,
+  checkUsername
 } from '../controllers/userController.js';
 import { protect, admin, testToken } from '../middleware/authMiddleware.js';
 import { uploadSingle, handleMulterError } from '../middleware/uploadMiddleware.js';
@@ -19,6 +20,7 @@ const router = express.Router();
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
+router.get('/check-username', checkUsername);
 
 // Test endpoint to check request body parsing
 router.post('/test-body', (req, res) => {

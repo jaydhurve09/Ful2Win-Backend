@@ -286,7 +286,8 @@ const updateUserProfile = async (req, res) => {
     // List of allowed fields that can be updated
     const allowedUpdates = [
       'fullName', 'email', 'phoneNumber', 'bio', 
-      'dateOfBirth', 'gender', 'country', 'profilePicture'
+      'dateOfBirth', 'gender', 'country', 'profilePicture',
+      'username'  // Added username to allowed updates
     ];
     
     // Initialize updates object
@@ -295,11 +296,40 @@ const updateUserProfile = async (req, res) => {
     // Add all allowed fields from req.body to updatesToApply
     allowedUpdates.forEach(field => {
       if (updates[field] !== undefined) {
-        updatesToApply[field] = updates[field];
+        // Special handling for username to ensure it's lowercase and trimmed
+        if (field === 'username' && updates[field]) {
+          updatesToApply[field] = updates[field].toString().toLowerCase().trim();
+        } else {
+          updatesToApply[field] = updates[field];
+        }
       }
     });
     
     console.log('Processing updates:', updatesToApply);
+    
+    // Validate username format if it's being updated
+    if (updatesToApply.username) {
+      const usernameRegex = /^[a-z0-9._-]+$/;
+      if (!usernameRegex.test(updatesToApply.username)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username can only contain letters, numbers, dots, underscores, and hyphens'
+        });
+      }
+      
+      // Check if username is already taken by another user
+      const existingUser = await User.findOne({ 
+        username: updatesToApply.username,
+        _id: { $ne: userId } // Exclude current user from the check
+      });
+      
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username is already taken'
+        });
+      }
+    }
     
     // Handle empty profilePicture object
     if (updates.profilePicture && 
@@ -559,10 +589,52 @@ const logoutUser = async (req, res) => {
   }
 };
 
+// @desc    Check if username is available
+// @route   GET /api/users/check-username
+// @access  Public
+const checkUsername = async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username is required'
+      });
+    }
+
+    // Check if username matches the required pattern
+    const usernameRegex = /^[a-z0-9._-]+$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username can only contain letters, numbers, dots, underscores, and hyphens'
+      });
+    }
+
+    // Check if username already exists
+    const existingUser = await User.findOne({ username });
+    
+    return res.status(200).json({
+      success: true,
+      available: !existingUser
+    });
+    
+  } catch (error) {
+    console.error('Error checking username:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error checking username availability',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 export { 
   registerUser, 
   loginUser, 
   logoutUser,
+  checkUsername,
   getUserProfile,
   getCurrentUserProfile,
   updateUserProfile,

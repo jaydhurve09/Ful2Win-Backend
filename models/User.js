@@ -3,7 +3,46 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+// Function to generate username from full name
+const generateUsername = async (fullName) => {
+  // Convert to lowercase and replace spaces with dots
+  let baseUsername = fullName
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '.');  // Replace spaces with dots
+    
+  // Remove all special characters except dots, underscores, and hyphens
+  baseUsername = baseUsername.replace(/[^a-z0-9._-]/g, '');
+  
+  // Ensure username is not empty
+  if (!baseUsername) {
+    baseUsername = 'user';
+  }
+  
+  // Check if username already exists
+  let username = baseUsername;
+  let counter = 1;
+  
+  while (true) {
+    const existingUser = await mongoose.model('User').findOne({ username });
+    if (!existingUser) break;
+    username = `${baseUsername}${counter}`;
+    counter++;
+  }
+  
+  return username;
+};
+
 const userSchema = new mongoose.Schema({
+  username: {
+    type: String,
+    required: false, // Made optional as it will be auto-generated
+    unique: true,
+    sparse: true, // Allows multiple null values for unique index
+    trim: true,
+    lowercase: true,
+    match: [/^[a-z0-9._-]+$/, 'Username can only contain letters, numbers, dots, underscores, and hyphens']
+  },
   fullName: {
     type: String,
     required: true,
@@ -120,29 +159,26 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-userSchema.pre('save', async function (next) {
-  console.log('=== User Pre-Save Hook ===');
-  console.log('Document being saved:', {
-    _id: this._id,
-    fullName: this.fullName,
-    phoneNumber: this.phoneNumber,
-    isNew: this.isNew,
-    modifiedPaths: this.modifiedPaths()
-  });
-
-  if (!this.isModified('password')) {
-    console.log('Password not modified, skipping hashing');
-    return next();
+userSchema.pre('save', async function(next) {
+  // Generate username if new user or username is not set
+  if (this.isNew || !this.username) {
+    try {
+      this.username = await generateUsername(this.fullName);
+      console.log(`Generated username: ${this.username} for user: ${this.fullName}`);
+    } catch (error) {
+      console.error('Error generating username:', error);
+      // Don't block the save if username generation fails
+    }
   }
   
+  // Only hash password if it was modified
+  if (!this.isModified('password')) return next();
+  
   try {
-    console.log('Hashing password...');
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    console.log('Password hashed successfully');
     next();
   } catch (error) {
-    console.error('Error hashing password:', error);
     next(error);
   }
 });
