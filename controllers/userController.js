@@ -342,16 +342,33 @@ const updateUserProfile = async (req, res) => {
     // Handle profile picture upload if a new file is provided
     if (req.file) {
       try {
-        console.log('Processing new profile picture upload...');
+        console.log('Processing new profile picture upload...', {
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          hasBuffer: !!req.file.buffer,
+          bufferLength: req.file.buffer?.length
+        });
         
         // Validate file
-        if (!req.file.buffer) {
-          throw new Error('File buffer is empty. The file might be corrupted or too large.');
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+          console.error('File buffer is empty or invalid:', req.file);
+          throw new Error('File buffer is empty. The file might be corrupted, too large, or not properly uploaded.');
         }
 
         const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (!allowedMimeTypes.includes(req.file.mimetype)) {
-          throw new Error(`Unsupported file type: ${req.file.mimetype}. Please upload an image file (JPEG, PNG, GIF, or WebP).`);
+          const errorMsg = `Unsupported file type: ${req.file.mimetype}. Please upload an image file (JPEG, PNG, GIF, or WebP).`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
+        }
+        
+        // Additional file size check (5MB limit)
+        const maxFileSize = 5 * 1024 * 1024; // 5MB
+        if (req.file.size > maxFileSize) {
+          const errorMsg = `File is too large. Maximum allowed size is 5MB.`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
         }
         
         // Convert buffer to base64 for Cloudinary
@@ -360,44 +377,66 @@ const updateUserProfile = async (req, res) => {
         
         console.log('Uploading to Cloudinary...');
         
-        // Upload to Cloudinary using base64
-        const result = await cloudinary.uploader.upload(dataUri, {
-          folder: "profiles",
-          use_filename: true,
-          unique_filename: true,
-          resource_type: 'auto',
-          transformation: [
-            { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
-            { quality: 'auto:good' }
-          ]
-        });
-        
-        if (!result?.secure_url) {
-          throw new Error('Failed to upload image to Cloudinary: No URL returned');
-        }
-        
-        console.log('Cloudinary upload successful:', {
-          url: result.secure_url,
-          public_id: result.public_id,
-          format: result.format,
-          bytes: result.bytes
-        });
-        
-        // Set the new profile picture URL
-        updatesToApply.profilePicture = result.secure_url;
-        
-        // Delete the old profile picture from Cloudinary if it exists
-        if (currentUser.profilePicture?.includes('cloudinary')) {
-          try {
-            const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
-            await cloudinary.uploader.destroy(`profiles/${publicId}`);
-            console.log('Old profile picture deleted from Cloudinary');
-          } catch (cloudErr) {
-            console.error('Error deleting old profile picture:', cloudErr);
-            // Don't fail the request if deletion of old image fails
+        try {
+          // Upload to Cloudinary using base64
+          const result = await cloudinary.uploader.upload(dataUri, {
+            folder: "profiles",
+            use_filename: true,
+            unique_filename: true,
+            resource_type: 'auto',
+            transformation: [
+              { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
+              { quality: 'auto:good' }
+            ]
+          });
+          
+          if (!result?.secure_url) {
+            throw new Error('Failed to upload image to Cloudinary: No URL returned');
           }
+          
+          console.log('Cloudinary upload successful:', {
+            url: result.secure_url,
+            public_id: result.public_id,
+            format: result.format,
+            bytes: result.bytes
+          });
+          
+          // Set the new profile picture URL
+          updatesToApply.profilePicture = result.secure_url;
+          
+          // Delete the old profile picture from Cloudinary if it exists
+          if (currentUser.profilePicture?.includes('cloudinary')) {
+            try {
+              const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
+              await cloudinary.uploader.destroy(`profiles/${publicId}`);
+              console.log('Old profile picture deleted from Cloudinary');
+            } catch (cloudErr) {
+              console.error('Error deleting old profile picture:', cloudErr);
+              // Don't fail the request if deletion of old image fails
+            }
+          }
+        } catch (cloudinaryError) {
+          console.error('Cloudinary upload error:', {
+            message: cloudinaryError.message,
+            http_code: cloudinaryError.http_code,
+            name: cloudinaryError.name,
+            stack: cloudinaryError.stack
+          });
+          throw new Error(`Failed to upload image to Cloudinary: ${cloudinaryError.message}`);
         }
+        
+
       } catch (uploadError) {
+        console.error('Profile picture upload failed:', {
+          message: uploadError.message,
+          stack: uploadError.stack,
+          name: uploadError.name
+        });
+        
+        // If there was an error with the file upload, remove any partial data
+        if (updatesToApply.profilePicture) {
+          delete updatesToApply.profilePicture;
+        }
         console.error('Error uploading profile picture:', uploadError);
         return res.status(500).json({ 
           success: false, 
