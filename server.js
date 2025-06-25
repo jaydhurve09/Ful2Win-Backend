@@ -39,7 +39,8 @@ let server;
 const allowedOrigins = [
   'http://localhost:5173',  // Local development
   process.env.FRONTEND_URL,  // Replace with your frontend domain
-  'https://ful2win.onrender.com'     // Render frontend URL
+  'https://ful2win.onrender.com/',     // Render frontend URL
+  'https://ful-2-win.vercel.app/'
 ];
 
 const corsOptions = {
