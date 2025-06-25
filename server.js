@@ -38,7 +38,7 @@ let server;
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:5173',  // Local development
-  'https://your-frontend-domain.com',  // Replace with your frontend domain
+  process.env.FRONTEND_URL,  // Replace with your frontend domain
   'https://ful2win.onrender.com'     // Render frontend URL
 ];
 
@@ -55,11 +55,29 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'X-Test-Request'  // Add custom header
+  ],
+  exposedHeaders: [
+    'Content-Length', 
+    'X-Foo', 
+    'X-Bar'
+  ]
 };
 
-// Enable CORS first
+// Simple health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Enable CORS
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Enable preflight for all routes
 
@@ -129,7 +147,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// Error handling for JSON parsing - must be after body parsers
+// Test endpoint - must be before error handling
+app.post('/api/users/test-endpoint', (req, res) => {
+  console.log('=== Test Endpoint Hit ===');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  
+  res.json({
+    success: true,
+    message: 'Test endpoint is working',
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    headers: req.headers
+  });
+});
+
+// Error handling for JSON parsing - must be after body parsers but before other routes
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && 'body' in err) {
     console.error('JSON parsing error:', err);
