@@ -2,6 +2,47 @@
 
 A robust backend system for managing multiplayer games, user scores, and social features. This project supports multiple games, including 2D Car Racing and Whack-A-Mole, with real-time score tracking and match management.
 
+## 🚀 Deployment
+
+### Deploying to Render
+
+1. **Create a Render Account**
+   - Go to [Render](https://render.com) and sign up for an account
+   - Verify your email address
+
+2. **Create a New Web Service**
+   - Click "New" and select "Web Service"
+   - Connect your GitHub/GitLab repository or deploy manually
+   - Select the repository containing this project
+
+3. **Configure Web Service**
+   - **Name**: `ful2win-backend`
+   - **Region**: Choose the closest to your users
+   - **Branch**: `main` or your production branch
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Plan**: Select Free or upgrade for production
+
+4. **Environment Variables**
+   Add these environment variables in the Render dashboard:
+   ```
+   NODE_ENV=production
+   PORT=10000
+   MONGODB_URI=your_mongodb_connection_string
+   JWT_SECRET=your_secure_jwt_secret
+   JWT_EXPIRE=30d
+   JWT_COOKIE_EXPIRE=30
+   CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+   CLOUDINARY_API_KEY=your_cloudinary_api_key
+   CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+   FRONTEND_URL=https://your-frontend-domain.com
+   ```
+
+5. **Deploy**
+   - Click "Create Web Service"
+   - Wait for the build and deploy process to complete
+   - Your API will be available at: `https://ful2win-backend.onrender.com`
+
 ## 🚀 Features
 
 - **Game Management**: Add and manage multiple games

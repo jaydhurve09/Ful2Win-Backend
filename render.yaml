@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: ful2win-backend
+    env: node
+    build:
+      buildCommand: npm install
+      startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: ful2win-db
+          property: connectionString
+    plan: free
+    numInstances: 1
+
+databases:
+  - name: ful2win-db
+    databaseName: ful2win
+    user: ful2win_user
+    plan: free

@@ -7,7 +7,7 @@ import {
   unlikePost, 
   commentOnPost 
 } from '../controllers/postController.js';
-import { upload, handleMulterError } from '../middlewares/multer.js';
+import { upload, handleMulterError } from '../middleware/multer.js';
 
 const router = express.Router();
 

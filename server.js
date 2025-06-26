@@ -4,13 +4,26 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
+import mongoose from 'mongoose';
 import connectDB from './config/db.js';
-import { connectCloudinary } from './config/Cloudinary.js';
-import postRoutes from './routes/postRoute.js';
+import { connectCloudinary } from './config/cloudinary.js';
+import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
+<<<<<<< HEAD
 import walletRoutes from './routes/walletRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+=======
+import userRoutes from './routes/userRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  process.exit(1);
+});
+>>>>>>> upstream/main
 
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -20,8 +33,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env.production' : '.env' });
 
+<<<<<<< HEAD
 // Verify required environment variables
 const requiredEnvVars = [
   'RAZORPAY_KEY_ID',
@@ -48,17 +62,79 @@ if (missingVars.length > 0) {
   } catch (error) {
     console.error('Failed to initialize services:', error);
     process.exit(1);
+=======
+// Trust proxy for production
+app.set('trust proxy', 1);
+
+// Initialize services
+let server;
+
+// Add your frontend URL to the allowed origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
+  'https://ful2win.vercel.app',
+  'https://ful-2-win.vercel.app',
+  'https://www.ful2win.com',
+  'https://api.ful2win.com'
+].filter(Boolean);
+
+// Add FRONTEND_URL if it exists
+if (process.env.FRONTEND_URL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
+  if (!allowedOrigins.includes(frontendUrl)) {
+    allowedOrigins.push(frontendUrl);
+>>>>>>> upstream/main
   }
-})();
+}
 
 // CORS configuration
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests, or server-side requests)
+    if (!origin) return callback(null, true);
+    
+    // Normalize the origin by removing trailing slash for consistent comparison
+    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+    
+    // Check if the normalized origin is in the allowed origins
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
+      return normalizedOrigin === normalizedAllowed;
+    });
+    
+    if (!isAllowed) {
+      return callback(new Error('Not allowed by CORS'), false);
+    }
+    
+    return callback(null, true);
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Allow-Credentials',
+    'Accept',
+    'Origin'
+  ],
+  exposedHeaders: [
+    'Content-Length',
+    'Authorization'
+  ],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
+<<<<<<< HEAD
 // Parse JSON for all routes except webhooks (webhooks need raw body for signature verification)
 app.use((req, res, next) => {
   if (req.originalUrl.startsWith('/api/webhooks')) {
@@ -77,14 +153,112 @@ app.use((req, res, next) => {
   }
 });
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+=======
+// Simple health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Log CORS configuration
+console.log('CORS Allowed Origins:', allowedOrigins);
+
+// Apply CORS to all routes
+app.options('*', cors(corsOptions)); // Enable preflight for all routes
+app.use(cors(corsOptions));
+
+// Add CORS headers to all responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', true);
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  next();
+});
+
+// Enable preflight for all routes
+app.options('*', cors(corsOptions));
+
+// Body parsing middleware - must come before any route that needs to read the body
+app.use(express.json({ 
+  limit: '50mb',
+  strict: false, // Allow any JSON value
+  type: ['application/json', 'application/*+json', 'text/plain'] // Handle various content types
+}));
+
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '50mb',
+  type: ['application/x-www-form-urlencoded']
+}));
+
+// Raw body parser for text/plain
+app.use((req, res, next) => {
+  if (req.is('text/*')) {
+    let data = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => { data += chunk; });
+    req.on('end', () => {
+      try {
+        req.body = data ? JSON.parse(data) : {};
+        next();
+      } catch (e) {
+        req.body = data;
+        next();
+      }
+    });
+  } else {
+    next();
+  }
+});
+
+// Request logging middleware (production-friendly)
+app.use((req, res, next) => {
+  const start = Date.now();
+  const requestId = Math.random().toString(36).substring(2, 8);
+  req.requestId = requestId;
+
+  // Log only errors
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (res.statusCode >= 400) {
+      console.error(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    }
+  });
+
+  next();
+});
+
+
+// Error handling for JSON parsing
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid JSON in request body',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Bad request'
+    });
+  }
+  next(err);
+});
+>>>>>>> upstream/main
 
 // API Routes
+app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+<<<<<<< HEAD
 app.use('/api/wallet', walletRoutes);
 
 // Webhook routes (no body parsing for webhook verification)
 app.use('/api/webhooks', webhookRoutes);
+=======
+app.use('/api/auth', authRoutes);
+>>>>>>> upstream/main
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
@@ -210,6 +384,7 @@ app.get('/api/test', (req, res) => {
 // API Routes - This comes AFTER fileUpload middleware
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/users', userRoutes);
 
 //Serve static game files
 app.use('/games', express.static(path.join(__dirname, 'games')));
@@ -248,64 +423,65 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Global error handler for unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Consider whether to exit the process here
-  // process.exit(1);
-});
+// Start the server
+const startServer = async () => {
+  try {
+    console.log('Initializing database connection...');
+    await connectDB();
+    console.log('Database connection established');
+    
+    console.log('Initializing Cloudinary...');
+    await connectCloudinary();
+    
+    // Start the server
+    const port = process.env.PORT || 10000;
+    const server = app.listen(port, () => {
+      console.log(`Server running on port ${port} in ${process.env.NODE_ENV} mode`);
+      console.log(`API URL: http://localhost:${port}`);
+    });
+    
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (err) => {
+      console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+      console.error(err.name, err.message);
+      server.close(() => {
+        process.exit(1);
+      });
+    });
+    
+    // Handle SIGTERM for graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+      server.close(() => {
+        console.log('💥 Process terminated!');
+        process.exit(0);
+      });
+    });
+    
+    // Handle server errors
+    server.on('error', (error) => {
+      if (error.syscall !== 'listen') {
+        throw error;
+      }
 
-// Global error handler for uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  // Consider whether to exit the process here
-  // process.exit(1);
-});
-
-// Set port - default to 5001 to avoid conflicts with other services
-const PORT = 5001; // Hardcoded to 5001 to avoid any environment variable issues
-
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`API URL: http://localhost:${PORT}`);
-});
-
-// Handle server errors
-server.on('error', (error) => {
-  if (error.syscall !== 'listen') {
-    throw error;
+      // Handle specific listen errors with friendly messages
+      switch (error.code) {
+        case 'EACCES':
+          console.error(`Port ${port} requires elevated privileges`);
+          process.exit(1);
+        case 'EADDRINUSE':
+          console.error(`Port ${port} is already in use`);
+          process.exit(1);
+        default:
+          throw error;
+      }
+    });
+    
+  } catch (error) {
+    console.error('Failed to initialize services:', error);
+    process.exit(1);
   }
+};
 
-  // Handle specific listen errors with friendly messages
-  switch (error.code) {
-    case 'EACCES':
-      console.error(`Port ${PORT} requires elevated privileges`);
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      console.error(`Port ${PORT} is already in use`);
-      process.exit(1);
-      break;
-    default:
-      throw error;
-  }
-});
-
-// Handle process termination
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
-  });
-});
+// Start the server
+startServer();
