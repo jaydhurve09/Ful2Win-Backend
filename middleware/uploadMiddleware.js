@@ -117,12 +117,18 @@ const memoryStorage = multer.memoryStorage();
 
 // Initialize multer with configuration
 const upload = multer({
-  storage: memoryStorage, // Use memory storage for Cloudinary
-  limits: { 
+  storage: memoryStorage,
+  limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
     files: 1
   },
-  fileFilter: fileFilter
+  fileFilter: (req, file, cb) => {
+    // Accept images only
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+      return cb(new Error('Only image files are allowed!'), false);
+    }
+    cb(null, true);
+  }
 });
 
 // Middleware for handling single file upload

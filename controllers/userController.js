@@ -356,38 +356,30 @@ const updateUserProfile = async (req, res) => {
     
     // Handle profile picture upload if a new file is provided
     if (req.file) {
-      // Skip if no buffer or path is available
-      if (!req.file.buffer && !req.file.path) {
+      console.log('Processing uploaded file:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        hasBuffer: !!req.file.buffer,
+        fieldname: req.file.fieldname,
+        encoding: req.file.encoding,
+        requestHeaders: req.headers
+      });
+
+      // Validate file buffer
+      if (!req.file.buffer || !Buffer.isBuffer(req.file.buffer) || req.file.buffer.length === 0) {
+        console.error('Invalid or empty file buffer received');
         return res.status(400).json({
           success: false,
-          message: 'File upload failed: Could not process the file.'
+          message: 'File upload failed: Invalid file data received.'
         });
       }
       
-      // If buffer is missing but path exists, try to read the file
-      if (!req.file.buffer && req.file.path) {
-        try {
-          req.file.buffer = fs.readFileSync(req.file.path);
-        } catch (error) {
-          return res.status(400).json({
-            success: false,
-            message: 'Could not read the uploaded file.'
-          });
-        }
-      }
-      
       try {
-        // Basic validation
-        if (!req.file.buffer) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'No file data received' 
-          });
-        }
-
         // File type validation
         const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (!allowedMimeTypes.includes(req.file.mimetype)) {
+          console.error('Invalid file type:', req.file.mimetype);
           return res.status(400).json({ 
             success: false, 
             message: 'Unsupported file type. Please upload an image file (JPEG, PNG, GIF, or WebP).' 
@@ -395,8 +387,9 @@ const updateUserProfile = async (req, res) => {
         }
         
         // File size check (5MB limit)
-        const maxFileSize = 5 * 1024 * 1024;
+        const maxFileSize = 5 * 1024 * 1024; // 5MB
         if (req.file.size > maxFileSize) {
+          console.error('File size exceeds limit:', req.file.size, 'bytes');
           return res.status(400).json({ 
             success: false, 
             message: 'File is too large. Maximum allowed size is 5MB.' 
@@ -438,9 +431,9 @@ const updateUserProfile = async (req, res) => {
           updatesToApply.profilePicture = uploadResult.secure_url;
           
           // If user had a previous profile picture and it's from Cloudinary, delete it
-          if (user.profilePicture && user.profilePicture.includes('cloudinary.com')) {
+          if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary.com')) {
             try {
-              const publicId = user.profilePicture.split('/').pop().split('.')[0];
+              const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
               await cloudinary.uploader.destroy(`profiles/${publicId}`);
             } catch (deleteError) {
               // Don't fail the request if deletion of old image fails

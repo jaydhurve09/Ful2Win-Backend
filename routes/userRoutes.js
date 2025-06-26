@@ -92,7 +92,41 @@ router.get('/profile/:userId', getUserProfile);
 router.put(
   '/profile/:userId', 
   protect, // Ensure user is authenticated
-  uploadSingle('profilePicture'),
+  (req, res, next) => {
+    // Log the incoming request headers
+    console.log('Request headers:', req.headers);
+    console.log('Content-Type header:', req.get('Content-Type'));
+    console.log('Content-Length header:', req.get('Content-Length'));
+    
+    // Check if the request is multipart
+    const isMultipart = req.is('multipart/form-data');
+    console.log('Is multipart request:', isMultipart);
+    
+    // Handle the file upload
+    uploadSingle('profilePicture')(req, res, (err) => {
+      if (err) {
+        console.error('File upload error:', err);
+        return res.status(400).json({
+          success: false,
+          message: err.message || 'Error uploading file'
+        });
+      }
+      
+      // Log file upload details
+      if (req.file) {
+        console.log('File uploaded successfully:', {
+          fieldname: req.file.fieldname,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size
+        });
+      } else {
+        console.log('No file was uploaded');
+      }
+      
+      next();
+    });
+  },
   updateUserProfile
 );
 
