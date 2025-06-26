@@ -35,11 +35,8 @@
     "ngrok": "^5.0.0-beta.2",
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
-<<<<<<< HEAD
+    "path-to-regexp": "^6.3.0",
     "razorpay": "^2.9.6"
-=======
-    "path-to-regexp": "^6.2.1"
->>>>>>> upstream/main
   },
   "devDependencies": {
     "@babel/core": "^7.23.0",

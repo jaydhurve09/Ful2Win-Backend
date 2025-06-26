@@ -1,12 +1,12 @@
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
+export const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
   const options = {
     amount: amount * 100, // Razorpay expects amount in paise
     currency,
@@ -23,7 +23,7 @@ const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
   }
 };
 
-const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
+export const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
   const text = `${razorpayOrderId}|${razorpayPaymentId}`;
   const generatedSignature = crypto
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
@@ -33,8 +33,6 @@ const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) =>
   return generatedSignature === razorpaySignature;
 };
 
-module.exports = {
-  createOrder,
-  verifyPayment,
-  razorpay
-};
+// Export razorpay instance as default
+export { razorpay };
+export default razorpay;

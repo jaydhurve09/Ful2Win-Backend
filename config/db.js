@@ -5,28 +5,14 @@ const connectDB = async () => {
     // Use MONGODB_URI from environment variables or fallback to local
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ful2win';
     
-    // Don't log the full connection string for security
-    console.log('=== MongoDB Connection ===');
-    console.log('Connecting to MongoDB...');
-    
-    // Set mongoose options
+    // Set mongoose options - removed deprecated options
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       family: 4, // Use IPv4, skip trying IPv6
     };
     
-    // Connection events
-    mongoose.connection.on('connecting', () => {
-      console.log('MongoDB: Connecting...');
-    });
-
-    mongoose.connection.on('connected', () => {
-      console.log('MongoDB: Connected successfully');
-    });
-
+    // Connection events - only log errors and disconnections
     mongoose.connection.on('error', (err) => {
       console.error('MongoDB: Connection error:', err.message);
     });
@@ -36,13 +22,16 @@ const connectDB = async () => {
     });
 
     // Connect to MongoDB
+    console.log('Connecting to MongoDB...');
     await mongoose.connect(mongoUri, options);
     
-    console.log('MongoDB: Connected to database:', mongoose.connection.name);
-    
-    // Simple ping to verify connection
-    await mongoose.connection.db.admin().ping();
-    console.log('MongoDB: Pinged successfully');
+    // Verify connection by listing collections
+    try {
+      const collections = await mongoose.connection.db.listCollections().toArray();
+      console.log(`MongoDB: Connected to database '${mongoose.connection.name}' (${collections.length} collections)`);
+    } catch (listError) {
+      console.log(`MongoDB: Connected to database '${mongoose.connection.name}' (new database)`);
+    }
     
     return mongoose.connection;
     

@@ -209,15 +209,7 @@ userSchema.post('save', function(doc) {
   });
 });
 
-// Add post-init hook to log when documents are loaded
-userSchema.post('init', function(doc) {
-  console.log('=== User Post-Init Hook ===');
-  console.log('Document loaded from database:', {
-    _id: doc._id,
-    fullName: doc.fullName,
-    phoneNumber: doc.phoneNumber
-  });
-});
+// Post-init hook removed for cleaner logs
 
 // Method to compare password
 userSchema.methods.matchPassword = async function (enteredPassword) {

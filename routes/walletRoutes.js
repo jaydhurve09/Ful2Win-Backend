@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import { protect } from '../middleware/authMiddleware.js';
+import * as walletController from '../controllers/walletController.js';
+
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
-const walletController = require('../controllers/walletController');
 
 // Protected routes (require authentication)
 router.use(protect);
@@ -15,4 +16,4 @@ router.post('/verify-payment', walletController.verifyAndUpdateWallet);
 // Get wallet balance
 router.get('/balance', walletController.getWalletBalance);
 
-module.exports = router;
+export default router;

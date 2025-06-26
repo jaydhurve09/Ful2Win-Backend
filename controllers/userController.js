@@ -231,24 +231,17 @@ const getUserProfile = async (req, res) => {
 // @access  Private
 const getCurrentUserProfile = async (req, res) => {
   try {
-    console.log('Fetching current user profile for ID:', req.user?._id);
-    
     const user = await User.findById(req.user._id)
       .select('-password -__v -refreshToken')
       .populate('followers following', 'fullName profilePicture')
       .populate('posts', 'title content image likes comments');
 
     if (!user) {
-      console.log('Current user not found with ID:', req.user._id);
       return res.status(404).json({ message: 'User not found' });
     }
 
-    console.log('Found current user:', {
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      phoneNumber: user.phoneNumber
-    });
+    // Clean user data before sending
+    const userData = user.toObject();
     
     res.json(user);
   } catch (error) {
