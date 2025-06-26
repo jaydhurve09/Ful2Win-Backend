@@ -9,6 +9,8 @@ import { connectCloudinary } from './config/Cloudinary.js';
 import postRoutes from './routes/postRoute.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
+import walletRoutes from './routes/walletRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +21,19 @@ const app = express();
 
 // Load environment variables
 dotenv.config();
+
+// Verify required environment variables
+const requiredEnvVars = [
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
+  'RAZORPAY_WEBHOOK_SECRET'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  process.exit(1);
+}
 
 // Initialize database and cloud services
 (async () => {
@@ -44,14 +59,32 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Basic middleware
-app.use(cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
+// Parse JSON for all routes except webhooks (webhooks need raw body for signature verification)
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/webhooks')) {
+    next();
+  } else {
+    express.json({ limit: '50mb' })(req, res, next);
+  }
+});
+
+// Apply CORS to all routes except webhooks
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/webhooks')) {
+    next();
+  } else {
+    cors(corsOptions)(req, res, next);
+  }
+});
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // API Routes
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/wallet', walletRoutes);
+
+// Webhook routes (no body parsing for webhook verification)
+app.use('/api/webhooks', webhookRoutes);
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
