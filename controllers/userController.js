@@ -675,10 +675,127 @@ const checkUsername = async (req, res) => {
   }
 };
 
+// @desc    Request password reset OTP
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required'
+      });
+    }
+
+    // Find user by phone number
+    const user = await User.findOne({ phoneNumber });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No user found with this phone number'
+      });
+    }
+
+    // Generate a 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    // Save OTP and expiry to user document
+    user.resetPasswordToken = otp;
+    user.resetPasswordExpire = otpExpiry;
+    await user.save();
+
+    // TODO: In a production environment, you would send this OTP via SMS
+    console.log(`Password reset OTP for ${phoneNumber}: ${otp}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to registered phone number',
+      // In production, don't send the OTP in the response
+      otp: process.env.NODE_ENV === 'development' ? otp : undefined
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Reset password with OTP
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { phoneNumber, otp, newPassword } = req.body;
+
+    // Validate input
+    if (!phoneNumber || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number, OTP, and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    // Find user by phone number and check OTP
+    const user = await User.findOne({
+      phoneNumber,
+      resetPasswordToken: otp,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    // Update password and clear reset token
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    // Invalidate all existing tokens (optional)
+    // user.tokens = [];
+    // await user.save();
+
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful. You can now login with your new password.'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
 export { 
   registerUser, 
   loginUser, 
   logoutUser,
+  forgotPassword,
+  resetPassword,
   checkUsername,
   getUserProfile,
   getCurrentUserProfile,

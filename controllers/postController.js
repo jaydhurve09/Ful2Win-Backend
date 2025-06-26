@@ -4,42 +4,80 @@ import User from '../models/User.js';
 
 /**
  * @desc    Create a new post
- * @route   POST /api/posts/create
+ * @route   POST /api/posts
  * @access  Private
  */
 const createPost = async (req, res) => {
   try {
-    const { title, content, likes, comments, author, createdAt } = req.body;
+    const { content, tags } = req.body;
+    const author = req.user.id; // Get user ID from auth middleware
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    // Validate required fields
+    if (!content) {
+      return res.status(400).json({ message: 'Content is required' });
     }
 
-    // Upload image to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "posts",
-      use_filename: true,
-      unique_filename: false,
+    // Create post data object
+    const postData = {
+      title: content.substring(0, 50) + (content.length > 50 ? '...' : ''), // Auto-generate title from content
+      content,
+      author,
+      tags: tags ? tags.split(',').map(tag => tag.trim()) : []
+    };
+
+    // Handle file upload if present
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "posts",
+          use_filename: true,
+          unique_filename: false,
+        });
+        
+        // Add image to post data
+        postData.images = [{
+          url: result.secure_url,
+          publicId: result.public_id,
+          width: result.width,
+          height: result.height
+        }];
+      } catch (uploadError) {
+        console.error('Error uploading media:', uploadError);
+        return res.status(500).json({ message: 'Error uploading media' });
+      }
+    }
+
+    // Create and save the post
+    const newPost = new Post(postData);
+    await newPost.save();
+    
+    // Populate author details for the response
+    await newPost.populate({
+      path: 'author',
+      select: 'username name verified'
     });
 
-    // Create a new post
-    const newPost = new Post({
-      title,
-      content,
-      image: result.secure_url, // Store the secure URL of the uploaded image
-      author,
-      likes,
-      comments,
-      createdAt
-    });
-    // Save the post to the database
-    await newPost.save();
     res.status(201).json({
-      message: "Post created successfully"
+      _id: newPost._id,
+      content: newPost.content,
+      image: newPost.images?.[0]?.url,
+      user: {
+        _id: newPost.author._id,
+        username: newPost.author.username,
+        name: newPost.author.name,
+        verified: newPost.author.verified
+      },
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      createdAt: newPost.createdAt,
+      updatedAt: newPost.updatedAt
     });
   } catch (error) {
     console.error("Error creating post:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ 
+      message: error.message || "Internal server error" 
+    });
   }
 }
 

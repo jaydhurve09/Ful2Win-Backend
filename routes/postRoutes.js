@@ -8,13 +8,13 @@ const router = express.Router();
 // Import the postController methods
 import * as postController from '../controllers/postController.js';
 
-// Create a new post with media upload
+// Create a new post (with optional media)
 router.post(
   '/',
   protect,
   (req, res, next) => {
-    // Use the upload middleware
-    uploadPostMedia(req, res, (err) => {
+    // Use the upload middleware (handles both with and without files)
+    uploadPostMedia.single('media')(req, res, (err) => {
       if (err) {
         return handleMulterError(err, req, res, next);
       }

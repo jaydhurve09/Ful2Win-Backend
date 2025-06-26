@@ -11,6 +11,7 @@ import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 import userRoutes from './routes/userRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
@@ -195,6 +196,7 @@ app.use((err, req, res, next) => {
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/auth', authRoutes);
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path

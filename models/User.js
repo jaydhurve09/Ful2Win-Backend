@@ -91,13 +91,22 @@ const userSchema = new mongoose.Schema({
   },
   balance: {
     type: Number,
-    default: 0,
-    min: 0
+    default: 0.00,
+    min: 0,
+    set: v => parseFloat(v.toFixed(2)) // Ensure 2 decimal places
   },
   coins: {
     type: Number,
     default: 0,
     min: 0
+  },
+  resetPasswordToken: {
+    type: String,
+    select: false
+  },
+  resetPasswordExpire: {
+    type: Date,
+    select: false
   },
   isVerified: {
     type: Boolean,
