@@ -10,6 +10,10 @@ import { connectCloudinary } from './config/cloudinary.js';
 import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
+<<<<<<< HEAD
+import walletRoutes from './routes/walletRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
+=======
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 
@@ -19,6 +23,7 @@ process.on('uncaughtException', (err) => {
   console.error(err.name, err.message);
   process.exit(1);
 });
+>>>>>>> upstream/main
 
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +35,34 @@ const app = express();
 // Load environment variables
 dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env.production' : '.env' });
 
+<<<<<<< HEAD
+// Verify required environment variables
+const requiredEnvVars = [
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
+  'RAZORPAY_WEBHOOK_SECRET'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  process.exit(1);
+}
+
+// Initialize database and cloud services
+(async () => {
+  try {
+    console.log('Initializing database connection...');
+    await connectDB();
+    console.log('Database connection established');
+    
+    console.log('Initializing Cloudinary...');
+    await connectCloudinary();
+    console.log('Cloudinary connected successfully');
+  } catch (error) {
+    console.error('Failed to initialize services:', error);
+    process.exit(1);
+=======
 // Trust proxy for production
 app.set('trust proxy', 1);
 
@@ -52,6 +85,7 @@ if (process.env.FRONTEND_URL) {
   const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
+>>>>>>> upstream/main
   }
 }
 
@@ -100,6 +134,26 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
+<<<<<<< HEAD
+// Parse JSON for all routes except webhooks (webhooks need raw body for signature verification)
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/webhooks')) {
+    next();
+  } else {
+    express.json({ limit: '50mb' })(req, res, next);
+  }
+});
+
+// Apply CORS to all routes except webhooks
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/webhooks')) {
+    next();
+  } else {
+    cors(corsOptions)(req, res, next);
+  }
+});
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+=======
 // Simple health check endpoint
 app.get('/', (req, res) => {
   res.json({ 
@@ -191,12 +245,20 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+>>>>>>> upstream/main
 
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
+<<<<<<< HEAD
+app.use('/api/wallet', walletRoutes);
+
+// Webhook routes (no body parsing for webhook verification)
+app.use('/api/webhooks', webhookRoutes);
+=======
 app.use('/api/auth', authRoutes);
+>>>>>>> upstream/main
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
