@@ -94,6 +94,11 @@ const userSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  coins: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   isVerified: {
     type: Boolean,
     default: false
@@ -150,7 +155,9 @@ const userSchema = new mongoose.Schema({
     followerCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
     likeCount: { type: Number, default: 0 },
-    commentCount: { type: Number, default: 0 }
+    commentCount: { type: Number, default: 0 },
+    matches: { type: Number, default: 0 },
+    wins: { type: Number, default: 0 }
   }
 }, {
   timestamps: true,
