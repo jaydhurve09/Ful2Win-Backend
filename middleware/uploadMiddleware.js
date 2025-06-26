@@ -115,20 +115,23 @@ const handleMulterError = (err, req, res, next) => {
 // Initialize multer with memory storage for Cloudinary
 const memoryStorage = multer.memoryStorage();
 
-// Initialize multer with configuration
+// File filter for allowed file types
+const imageFileFilter = (req, file, cb) => {
+  // Accept images only
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+    return cb(new Error('Only image files (jpg, jpeg, png, gif) are allowed!'), false);
+  }
+  cb(null, true);
+};
+
+// Initialize multer with configuration for multiple files
 const upload = multer({
   storage: memoryStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1
+    fileSize: 5 * 1024 * 1024, // 5MB limit per file
+    files: 2 // Allow up to 2 files (thumbnail and coverImage)
   },
-  fileFilter: (req, file, cb) => {
-    // Accept images only
-    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-      return cb(new Error('Only image files are allowed!'), false);
-    }
-    cb(null, true);
-  }
+  fileFilter: imageFileFilter
 });
 
 // Middleware for handling single file upload

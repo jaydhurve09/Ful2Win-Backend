@@ -1,10 +1,11 @@
-import { GameMetadata, GameSession, GAME_CATEGORIES } from '../models/Game.js';
+import { Game, GAME_TYPES } from '../models/Game.js';
 import Match from '../models/Match.js';
 import User from '../models/User.js';
 import { v2 as cloudinary } from 'cloudinary';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,31 +44,77 @@ const getAllGames = async (req, res) => {
   }
 };
 
-// Get game by name
-const getGameByName = async (req, res) => {
+// Get game by name or ID
+const getGameInfo = async (req, res) => {
   try {
-    const game = await GameMetadata.findOne({
-      name: req.params.name,
-      isActive: true
-    }).select('-__v -createdAt -updatedAt');
-    if (!game) {
-      return res.status(404).json({ success: false, error: 'Game not found' });
+    const { nameOrId } = req.params;
+    
+    // Check if the parameter is a valid ObjectId (24 char hex string)
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(nameOrId);
+    
+    let query;
+    if (isObjectId) {
+      query = { _id: nameOrId };
+    } else {
+      query = { name: nameOrId.toLowerCase() };
     }
-    await game.incrementPlays();
-    res.json({ success: true, data: game });
+    
+    // First get the game without populating leaderboard
+    const game = await Game.findOne({
+      ...query,
+      'status.isActive': true
+    })
+    .select('-__v -createdAt -updatedAt -moderators -community.forumThreads -chatRooms')
+    .populate('creator', 'username avatar')
+    .lean();
+    
+    // If you need to populate leaderboard later, you can do it here
+    // For now, we'll skip it to avoid the schema error
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Game not found or inactive' 
+      });
+    }
+    
+    // Add full URL for thumbnail and cover image if they exist
+    if (game.assets?.thumbnail && !game.assets.thumbnail.startsWith('http')) {
+      game.assets.thumbnail = `${process.env.BASE_URL || 'http://localhost:5000'}/uploads/${game.assets.thumbnail}`;
+    }
+    
+    if (game.assets?.coverImage && !game.assets.coverImage.startsWith('http')) {
+      game.assets.coverImage = `${process.env.BASE_URL || 'http://localhost:5000'}/uploads/${game.assets.coverImage}`;
+    }
+    
+    res.json({ 
+      success: true, 
+      data: game 
+    });
+    
   } catch (error) {
     console.error('Error getting game:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch game information',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// Get game categories
+// Get game categories and types
 const getGameCategories = async (req, res) => {
   try {
-    res.json({ success: true, data: GAME_CATEGORIES });
+    res.status(200).json({
+      success: true,
+      data: {
+        types: GAME_TYPES,
+        // Add any other category/type data needed by the frontend
+      }
+    });
   } catch (error) {
     console.error('Error getting game categories:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
@@ -164,118 +211,128 @@ const getGameSession = async (req, res) => {
   }
 };
 
+// Helper function to upload file to Cloudinary
+const uploadToCloudinary = async (file) => {
+  if (!file) return null;
+  
+  try {
+    // Convert buffer to base64
+    const b64 = Buffer.from(file.buffer).toString('base64');
+    const dataURI = `data:${file.mimetype};base64,${b64}`;
+    
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: 'ful2win/games',
+      resource_type: 'auto',
+      quality: 'auto',
+      fetch_format: 'auto'
+    });
+    
+    return result.secure_url;
+  } catch (error) {
+    console.error('Error uploading to Cloudinary:', error);
+    return null;
+  }
+};
+
 // Add or update a game (with file upload)
 const addGame = async (req, res) => {
   try {
-    console.log('req.body:', req.body);
-    console.log('req.files:', req.files);
-    console.log('req.headers:', req.headers);
+    // Upload files to Cloudinary
+    const [thumbnailUrl, coverImageUrl] = await Promise.all([
+      req.files?.thumbnail?.[0] ? uploadToCloudinary(req.files.thumbnail[0]) : null,
+      req.files?.coverImage?.[0] ? uploadToCloudinary(req.files.coverImage[0]) : null
+    ]);
 
-    // Defensive destructuring
+    // Parse JSON fields
+    const gameData = {
+      ...req.body,
+      assets: {
+        ...(req.body.assets ? JSON.parse(req.body.assets) : {}),
+        ...(thumbnailUrl && { thumbnail: thumbnailUrl }),
+        ...(coverImageUrl && { coverImage: coverImageUrl })
+      },
+      ...(req.body.config && { config: JSON.parse(req.body.config) }),
+      ...(req.body.rules && { rules: JSON.parse(req.body.rules) }),
+      ...(req.body.creator && { creator: JSON.parse(req.body.creator) })
+    };
+
     const {
       name,
       displayName,
       description = '',
-      category = 'uncategorized',
-      tags = '[]',
-      version = '1.0.0',
-      config = '{}',
-      meta = '{}',
-      creator = '{}'
-    } = req.body || {};
+      type = 'Arcade',
+      modesAvailable = [],
+      assets = {},
+      config = {},
+      rules = {}
+    } = gameData;
 
     // Required field validation
     if (!name || !displayName) {
-      return res.status(400).json({ error: 'Name and displayName are required in form-data.' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Name and displayName are required' 
+      });
     }
 
-    // Parse JSON strings
-    let tagsArray;
-    let configObj;
-    let metaObj;
-    let creatorObj;
-    try {
-      tagsArray = JSON.parse(tags);
-      configObj = JSON.parse(config);
-      metaObj = JSON.parse(meta);
-      creatorObj = JSON.parse(creator);
-    } catch (parseError) {
-      console.error('Error parsing JSON fields:', parseError);
-      return res.status(400).json({ error: 'Invalid JSON in one of the fields', details: parseError.message });
-    }
-    // Handle file uploads
-    let thumbnailUrl = '';
-    if (req.files?.icon) {
-      const iconFile = req.files.icon;
-      try {
-        const uploadResult = await cloudinary.uploader.upload(iconFile.tempFilePath, {
-          folder: 'game-icons'
-        });
-        thumbnailUrl = uploadResult.secure_url;
-      } catch (uploadError) {
-        console.error('Error uploading icon:', uploadError);
-        return res.status(500).json({ error: 'Failed to upload game icon', details: uploadError.message });
-      }
-    }
-    // Handle game folder upload
-    let gamePath = '';
-    if (req.files?.gameFolder) {
-      const gameFolder = req.files.gameFolder;
-      const gameDir = path.join(__dirname, '..', 'games', name);
-      await fs.mkdir(gameDir, { recursive: true });
-      const targetPath = path.join(gameDir, gameFolder.name);
-      await fs.rename(gameFolder.tempFilePath, targetPath);
-      // If it's a zip file, you might want to extract it here
-      // For now, we'll assume it's already the game files
-      gamePath = `/${name}`;
-    }
-    // Create game data
-    const gameData = {
-      name: name.toLowerCase().replace(/\s+/g, '-'),
+    // Create new game object
+    const newGame = new Game({
+      name,
       displayName,
-      description: description || 'A fun game!',
-      thumbnail: thumbnailUrl || `/${name}/assets/icon.png`,
-      path: gamePath || `/${name}`,
-      category: category || 'uncategorized',
-      tags: Array.isArray(tagsArray) ? tagsArray : [tagsArray],
-      version,
-      config: {
-        hasScores: true,
-        supportsMultiplayer: false,
-        requiresFullscreen: false,
-        ...configObj
+      description,
+      type,
+      modesAvailable,
+      assets: {
+        ...assets,
+        ...(thumbnailUrl && { thumbnail: thumbnailUrl }),
+        ...(coverImageUrl && { coverImage: coverImageUrl }),
+        gameUrl: {
+          baseUrl: req.body.baseUrl || 'http://localhost:3000', // Default URL or from request
+          iframePath: `/games/${name}`
+        }
       },
-      meta: {
-        title: metaObj.title || `${displayName} - Game`,
-        description: metaObj.description || 'A fun game to play!',
-        keywords: metaObj.keywords || ['game', 'online'],
-        ...metaObj
-      },
-      creator: {
-        name: creatorObj.name || 'Game Developer',
-        url: creatorObj.url || 'https://example.com',
-        ...creatorObj
+      config: config || {},
+      rules: rules || {},
+      creator: req.user?.id || new mongoose.Types.ObjectId() // Use user ID or generate a new one
+    });
+
+    // Save the game to database
+    const savedGame = await newGame.save();
+
+    res.status(201).json({
+      success: true,
+      data: {
+        game: savedGame
       }
-    };
-    // Check if game exists
-    let game = await GameMetadata.findOne({ name: gameData.name });
-    if (game) {
-      // Update existing game
-      game = await GameMetadata.findOneAndUpdate(
-        { name: gameData.name },
-        { $set: gameData },
-        { new: true }
-      );
-      return res.status(200).json({ message: 'Game updated successfully', game });
-    } else {
-      // Create new game
-      game = new GameMetadata(gameData);
-      await game.save();
-      return res.status(201).json({ message: 'Game created successfully', game });
-    }
+    });
   } catch (error) {
-    console.error('Error adding/updating game:', error);
-    return res.status(500).json({ error: 'Failed to add/update game', details: error.message });
+    console.error('Error adding game:', error);
+    
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'A game with this name already exists'
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: messages
+      });
+    }
+
+    // Handle other errors
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -507,14 +564,132 @@ const createMatch = async (req, res) => {
   }
 };
 
+// Update an existing game
+const updateGame = async (req, res) => {
+  try {
+    const { nameOrId } = req.params;
+    const updateData = req.body;
+    const files = req.files;
+
+    // Check if the parameter is a valid ObjectId (24 char hex string)
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(nameOrId);
+    
+    let query;
+    if (isObjectId) {
+      query = { _id: nameOrId };
+    } else {
+      query = { name: nameOrId.toLowerCase() };
+    }
+
+    // Find the existing game
+    const existingGame = await Game.findOne(query);
+    if (!existingGame) {
+      return res.status(404).json({
+        success: false,
+        message: 'Game not found'
+      });
+    }
+
+    // Handle file uploads if any
+    if (files) {
+      if (files.thumbnail) {
+        const thumbnailResult = await uploadToCloudinary(files.thumbnail[0]);
+        updateData['assets.thumbnail'] = thumbnailResult.secure_url;
+      }
+      if (files.coverImage) {
+        const coverImageResult = await uploadToCloudinary(files.coverImage[0]);
+        updateData['assets.coverImage'] = coverImageResult.secure_url;
+      }
+    }
+
+    // Update game data
+    const updatedGame = await Game.findOneAndUpdate(
+      query,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    )
+    .select('-__v -createdAt -updatedAt -moderators -community.forumThreads -chatRooms')
+    .populate('creator', 'username avatar');
+
+    res.json({
+      success: true,
+      message: 'Game updated successfully',
+      data: updatedGame
+    });
+
+  } catch (error) {
+    console.error('Error updating game:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update game',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Delete a game
+const deleteGame = async (req, res) => {
+  try {
+    const { nameOrId } = req.params;
+
+    // Check if the parameter is a valid ObjectId (24 char hex string)
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(nameOrId);
+    
+    let query;
+    if (isObjectId) {
+      query = { _id: nameOrId };
+    } else {
+      query = { name: nameOrId.toLowerCase() };
+    }
+
+    // Find and delete the game
+    const deletedGame = await Game.findOneAndDelete(query);
+    
+    if (!deletedGame) {
+      return res.status(404).json({
+        success: false,
+        message: 'Game not found'
+      });
+    }
+
+    // TODO: Optionally delete associated files from Cloudinary
+    // if (deletedGame.assets?.thumbnail) {
+    //   await deleteFromCloudinary(deletedGame.assets.thumbnail);
+    // }
+    // if (deletedGame.assets?.coverImage) {
+    //   await deleteFromCloudinary(deletedGame.assets.coverImage);
+    // }
+
+    res.json({
+      success: true,
+      message: 'Game deleted successfully',
+      data: {
+        id: deletedGame._id,
+        name: deletedGame.name,
+        displayName: deletedGame.displayName
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting game:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete game',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 export {
   getAllGames,
-  getGameByName,
+  getGameInfo,
   getGameCategories,
   startGameSession,
   endGameSession,
   getGameSession,
   addGame,
+  updateGame,
+  deleteGame,
   submitScore,
   createMatch
 };

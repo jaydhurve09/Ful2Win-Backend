@@ -1,29 +1,52 @@
 import express from 'express';
 import { 
   getAllGames,
-  getGameByName,
+  getGameInfo,
   getGameCategories,
   startGameSession,
   endGameSession,
   getGameSession,
   addGame,
+  updateGame,
+  deleteGame,
   submitScore,
   createMatch
 } from '../controllers/gameController.js';
+import { upload, handleMulterError } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
 router.use(express.urlencoded({ extended: true }));
 
-// Admin routes
-router.post('/', addGame);
+// Configure multer for file uploads
+const uploadFields = [
+  { name: 'thumbnail', maxCount: 1 },
+  { name: 'coverImage', maxCount: 1 }
+];
+
+// Admin routes - Add new game with file uploads
+router.post('/', 
+  upload.fields(uploadFields),
+  handleMulterError,
+  addGame
+);
+
+// Update an existing game
+router.put('/:nameOrId', 
+  upload.fields(uploadFields),
+  handleMulterError,
+  updateGame
+);
+
+// Delete a game
+router.delete('/:nameOrId', deleteGame);
 
 // Get all games (with optional filtering)
 router.get('/', getAllGames);
 // Get game categories
 router.get('/categories', getGameCategories);
-// Get game by name
-router.get('/:name', getGameByName);
+// Get game by name or ID
+router.get('/:nameOrId', getGameInfo);
 // Start a new game session for a specific game
 router.post('/:gameName/start', startGameSession);
 
