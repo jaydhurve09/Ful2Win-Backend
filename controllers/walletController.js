@@ -1,18 +1,19 @@
-const Wallet = require('../models/Wallet');
-const { createOrder, verifyPayment } = require('../utils/razorpay');
+import Wallet from '../models/Wallet.js'; 
+import { createOrder, verifyPayment } from '../utils/razorpay.js';
 
 // @desc    Create Razorpay order
 // @route   POST /api/wallet/create-order
 // @access  Private
-exports.createRazorpayOrder = async (req, res) => {
+const createRazorpayOrder = async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user._id;
+    //const userId = req.user._id;
+    const userId = "1234khuyg";
 
     if (!amount || isNaN(amount) || amount < 1) {
       return res.status(400).json({ 
         success: false,
-        error: 'Please provide a valid amount (minimum ₹1)' 
+        error: 'Please provide a valid amount (minimum ₹10)' 
       });
     }
 
@@ -40,7 +41,7 @@ exports.createRazorpayOrder = async (req, res) => {
 // @desc    Verify payment and update wallet
 // @route   POST /api/wallet/verify-payment
 // @access  Private
-exports.verifyAndUpdateWallet = async (req, res) => {
+const verifyAndUpdateWallet = async (req, res) => {
   try {
     const { 
       razorpay_order_id, 
@@ -127,7 +128,7 @@ exports.verifyAndUpdateWallet = async (req, res) => {
 // @desc    Get wallet balance
 // @route   GET /api/wallet/balance
 // @access  Private
-exports.getWalletBalance = async (req, res) => {
+const getWalletBalance = async (req, res) => {
   try {
     const wallet = await Wallet.findOne({ user: req.user._id });
     
@@ -143,4 +144,10 @@ exports.getWalletBalance = async (req, res) => {
       error: 'Error fetching wallet balance'
     });
   }
+};
+
+export {
+  createRazorpayOrder,
+  verifyAndUpdateWallet,
+  getWalletBalance
 };

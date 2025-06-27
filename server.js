@@ -12,7 +12,7 @@ import gameRoutes from './routes/gameRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 
 import walletRoutes from './routes/walletRoutes.js';
-import webhookRoutes from './routes/webhookRoutes.js';
+//import webhookRoutes from './routes/webhookRoutes.js';
 
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -238,7 +238,7 @@ app.use('/api/games', gameRoutes);
 app.use('/api/wallet', walletRoutes);
 
 // Webhook routes (no body parsing for webhook verification)
-app.use('/api/webhooks', webhookRoutes);
+//app.use('/api/webhooks', webhookRoutes);
 
 app.use('/api/auth', authRoutes);
 
