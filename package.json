@@ -42,6 +42,7 @@
     "@babel/core": "^7.23.0",
     "@babel/node": "^7.22.20",
     "@babel/preset-env": "^7.22.20",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "terser": "^5.43.1"
   }
 }
