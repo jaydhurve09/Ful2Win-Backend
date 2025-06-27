@@ -88,6 +88,11 @@ const tournamentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  game: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Game',
+    required: true
+  },
   leaderboard: [leaderboardEntrySchema],
   entryFee: {
     type: Number,
