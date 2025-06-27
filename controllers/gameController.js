@@ -368,7 +368,7 @@ const addGame = async (req, res) => {
         ...(coverImageUrl && { coverImage: coverImageUrl }),
         gameUrl: {
           baseUrl: req.body.baseUrl || 'http://localhost:3000', // Default URL or from request
-          iframePath: `/games/${name}`
+          iframePath: `/${name}`
         }
       },
       config: config || {},
