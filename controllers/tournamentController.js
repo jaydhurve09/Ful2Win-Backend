@@ -21,7 +21,8 @@ const createTournament = async (req, res) => {
       endTime,
       maxPlayers = 100,
       gameId,
-      modesAvailable = ['Classic']
+      modesAvailable = ['Classic'],
+      status = 'upcoming'
     } = req.body;
 
     // Handle banner image upload if present
@@ -104,7 +105,7 @@ const createTournament = async (req, res) => {
       game: gameId,
       modesAvailable,
       tournamentCode,
-      status: 'upcoming',
+      status,
       currentPlayers: [],
       leaderboard: []
     });
