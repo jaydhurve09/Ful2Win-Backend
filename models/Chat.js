@@ -1,6 +1,12 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
+
 
 const messageSchema = new mongoose.Schema({
+  chat: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chat',
+    required: true
+  },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -10,15 +16,17 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  },
   read: {
     type: Boolean,
     default: false
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
   }
-});
+}, { timestamps: true });
+
+const Message = mongoose.models.Message||mongoose.model('Message', messageSchema);
 
 const chatSchema = new mongoose.Schema({
   participants: [{
@@ -26,15 +34,14 @@ const chatSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   }],
-  messages: [messageSchema],
   lastMessage: {
-    type: Date,
-    default: Date.now
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
   }
 }, { timestamps: true });
 
-// Index for faster queries
+// Index for faster query
 chatSchema.index({ participants: 1 });
-chatSchema.index({ lastMessage: -1 });
-
-module.exports = mongoose.model('Chat', chatSchema); 
+chatSchema.index({ updatedAt: -1 });
+const ChatModel = mongoose.models.Chat || mongoose.model('Chat', chatSchema);
+export { ChatModel, Message };
