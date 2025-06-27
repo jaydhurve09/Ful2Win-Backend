@@ -18,29 +18,108 @@ cloudinary.config({
   secure: true
 });
 
-// Get all games
+// Get all games with filtering, sorting, and pagination
 const getAllGames = async (req, res) => {
   try {
-    const { category, search, sortBy = 'name', sortOrder = 'asc' } = req.query;
-    const filter = { isActive: true };
-    if (category) filter.category = category;
+    console.log('=== GET /api/games called ===');
+    console.log('Query params:', req.query);
+
+    // Build filter object - removing isActive filter to get all games
+    const filter = {};
+    
+    // Extract query parameters
+    const { 
+      category, 
+      search, 
+      sortBy = 'name', 
+      sortOrder = 'asc',
+      page = 1,
+      limit = 100, // Increased limit to get all games
+      featured
+    } = req.query;
+
+    console.log('Initial filter:', filter);
+    
+    // Apply category filter if provided
+    if (category && category !== 'all') {
+      filter.category = category;
+      console.log('After category filter:', filter);
+    }
+    
+    // Apply search filter if provided
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { displayName: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } }
+        { 'tags.text': { $regex: search, $options: 'i' } }
       ];
+      console.log('After search filter:', filter);
     }
+
+    // Apply featured filter if provided
+    if (featured === 'true') {
+      filter.featured = true;
+      console.log('After featured filter:', filter);
+    }
+
+    // Build sort object
     const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
-    const games = await GameMetadata.find(filter)
+    const sortOptions = ['name', 'createdAt', 'updatedAt', 'popularity', 'rating'];
+    if (sortOptions.includes(sortBy)) {
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sort.name = 1; // Default sort by name ascending
+    }
+    console.log('Sort criteria:', sort);
+
+    // Get total count for pagination
+    const total = await Game.countDocuments(filter);
+    console.log('Total documents matching filter:', total);
+
+    // Get collection name and stats
+    const collectionName = Game.collection.name;
+    const totalInCollection = await Game.countDocuments({});
+    console.log(`Collection: ${collectionName}, Total documents: ${totalInCollection}`);
+
+    // Query database with filters, sorting, and pagination
+    const games = await Game.find(filter)
       .sort(sort)
-      .select('-__v -createdAt -updatedAt');
-    res.json({ success: true, count: games.length, data: games });
+      .limit(100) // Increased limit to get all games
+      .select('-__v -createdAt -updatedAt')
+      .lean();
+
+    console.log(`Found ${games.length} games`);
+    if (games.length > 0) {
+      console.log('First game sample:', {
+        _id: games[0]._id,
+        name: games[0].name,
+        displayName: games[0].displayName,
+        category: games[0].category
+      });
+    }
+
+    // Return response with pagination info
+    const response = {
+      success: true,
+      count: games.length,
+      total,
+      totalPages: 1, // Set to 1 since we're not using pagination for now
+      currentPage: 1,
+      data: games
+    };
+
+    console.log('Sending response with', games.length, 'games');
+    res.json(response);
+
   } catch (error) {
     console.error('Error getting games:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error while fetching games',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
