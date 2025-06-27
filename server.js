@@ -7,8 +7,10 @@ import fileUpload from 'express-fileupload';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
+import { isConfigured } from './config/cloudinary.js';
 import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
+import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 // import walletRoutes from './routes/walletRoutes.js';
 // import webhookRoutes from './routes/webhookRoutes.js';
@@ -30,7 +32,30 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Load environment variables
-dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env.production' : '.env' });
+const envPath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
+console.log(`[Server] Loading environment from: ${envPath}`);
+console.log(`[Server] Current working directory: ${process.cwd()}`);
+
+try {
+  const result = dotenv.config({ path: envPath });
+  if (result.error) {
+    console.error('[Server] Error loading .env file:', result.error);
+  } else {
+    console.log('[Server] Successfully loaded .env file');
+    // Log the Cloudinary config (masking sensitive values)
+    if (process.env.CLOUDINARY_NAME) {
+      console.log('[Server] Cloudinary Config:', {
+        CLOUDINARY_NAME: process.env.CLOUDINARY_NAME,
+        CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'Not set',
+        CLOUDINARY_SECRET_KEY: process.env.CLOUDINARY_SECRET_KEY ? '***' + process.env.CLOUDINARY_SECRET_KEY.slice(-4) : 'Not set'
+      });
+    } else {
+      console.warn('[Server] Cloudinary environment variables not found in .env file');
+    }
+  }
+} catch (error) {
+  console.error('[Server] Error loading environment variables:', error);
+}
 
 // Verify required environment variables
 // const requiredEnvVars = [
@@ -230,7 +255,8 @@ app.use((err, req, res, next) => {
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
-// app.use('/api/wallet', walletRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
 
 // Webhook routes (no body parsing for webhook verification)
 // app.use('/api/webhooks', webhookRoutes);
@@ -402,20 +428,32 @@ app.use((err, req, res, next) => {
 // Start the server
 const startServer = async () => {
   try {
-    // Initialize database and cloud services
+    // Initialize database
+    console.log('Connecting to MongoDB...');
     await connectDB();
-    await connectCloudinary();
+    
+    // Initialize Cloudinary (non-blocking)
+    console.log('Initializing Cloudinary...');
+    try {
+      await connectCloudinary();
+      console.log('✅ Cloudinary connected successfully');
+    } catch (error) {
+      console.warn('⚠️ Cloudinary initialization warning:', error.message);
+      console.log('⚠️ Server will start without Cloudinary. Some features may not work.');
+    }
     
     // Start the server
     const port = process.env.PORT || 10000;
     const server = app.listen(port, () => {
-      console.log(`Server running on port ${port} (${process.env.NODE_ENV} mode)`);
-      console.log(`API: http://localhost:${port}/api`);
+      console.log(`\n🚀 Server running on port ${port} (${process.env.NODE_ENV || 'development'} mode)`);
+      console.log(`🌐 API: http://localhost:${port}/api`);
+      console.log(`📝 API Documentation: http://localhost:${port}/api-docs`);
+      console.log('\nPress CTRL+C to stop the server\n');
     });
     
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (err) => {
-      console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+      console.error('\n❌ UNHANDLED REJECTION! Shutting down...');
       console.error(err.name, err.message);
       server.close(() => {
         process.exit(1);
@@ -424,7 +462,7 @@ const startServer = async () => {
     
     // Handle SIGTERM for graceful shutdown
     process.on('SIGTERM', () => {
-      console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+      console.log('\n👋 SIGTERM RECEIVED. Shutting down gracefully');
       server.close(() => {
         console.log('💥 Process terminated!');
         process.exit(0);
@@ -455,6 +493,9 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+// Export the app
+export { app };
 
 // Start the server
 startServer();

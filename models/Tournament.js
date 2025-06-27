@@ -38,6 +38,16 @@ const tournamentSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  bannerImage: {
+    url: {
+      type: String,
+      default: ''
+    },
+    publicId: {
+      type: String,
+      default: ''
+    }
+  },
   type: {
     type: String,
     required: true,
