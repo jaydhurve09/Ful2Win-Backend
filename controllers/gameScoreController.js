@@ -85,9 +85,26 @@ const MyScore = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+// POST /score/played-tournaments
+const PlayedTournaments = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const played = await scoreModel.find({ userId }).select("roomId gameName -_id");
+    return res.status(200).json({ played });
+  } catch (error) {
+    console.error("Error fetching played tournaments:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
   
 // Export the controller
 export {
-  gameScore, getScore, MyScore
+  gameScore, getScore, MyScore,
+  PlayedTournaments
 }
