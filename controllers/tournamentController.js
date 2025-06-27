@@ -12,6 +12,8 @@ const createTournament = async (req, res) => {
     const {
       name,
       type,
+      tournamentType = 'coin',
+      playerType = 'solo',
       description = '',
       entryFee = 0,
       prizePool = 0,
@@ -52,10 +54,26 @@ const createTournament = async (req, res) => {
     }
 
     // Validate required fields
-    if (!name || !type || !startTime || !gameId) {
+    if (!name || !type || !startTime || !gameId || !tournamentType || !playerType) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, type, startTime, and gameId are required'
+        message: 'Missing required fields: name, type, tournamentType, playerType, startTime, and gameId are required'
+      });
+    }
+
+    // Validate tournament type
+    if (!['cash', 'coin'].includes(tournamentType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tournament type. Must be either "cash" or "coin"'
+      });
+    }
+
+    // Validate player type
+    if (!['solo', 'multiplayer', 'teams'].includes(playerType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid player type. Must be one of: "solo", "multiplayer", or "teams"'
       });
     }
 
@@ -74,6 +92,8 @@ const createTournament = async (req, res) => {
     const tournament = new Tournament({
       name,
       type,
+      tournamentType,
+      playerType,
       description,
       entryFee,
       prizePool,
@@ -215,6 +235,22 @@ const updateTournament = async (req, res) => {
           note: 'Cloudinary service not available'
         };
       }
+    }
+
+    // Validate tournament type if being updated
+    if (updateData.tournamentType && !['cash', 'coin'].includes(updateData.tournamentType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tournament type. Must be either "cash" or "coin"'
+      });
+    }
+
+    // Validate player type if being updated
+    if (updateData.playerType && !['solo', 'multiplayer', 'teams'].includes(updateData.playerType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid player type. Must be one of: "solo", "multiplayer", or "teams"'
+      });
     }
 
     // Remove fields that shouldn't be updated

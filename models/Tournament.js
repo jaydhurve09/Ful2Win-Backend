@@ -38,6 +38,18 @@ const tournamentSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  tournamentType: {
+    type: String,
+    enum: ['cash', 'coin'],
+    required: true,
+    default: 'coin'
+  },
+  playerType: {
+    type: String,
+    enum: ['solo', 'multiplayer', 'teams'],
+    required: true,
+    default: 'solo'
+  },
   bannerImage: {
     url: {
       type: String,
