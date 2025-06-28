@@ -16,6 +16,7 @@ import carRacingRoute from './routes/carRacingRoute.js';
 // import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import Gamerouter from './routes/gameRoute.js';
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
@@ -257,7 +258,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/car-racing', carRacingRoute);
-
+app.use('/api/score', Gamerouter); // Add the new game route
 // Webhook routes (no body parsing for webhook verification)
 // app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', authRoutes);
