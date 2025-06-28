@@ -95,8 +95,8 @@ router.delete(
   postController.deletePost
 );
 
-// Like/Unlike a post
-router.post('/:id/like', protect, postController.likePost);
+// Like/Unlike a post (expects { postId, userId } in request body)
+router.post('/like', protect, postController.likePost);
 
 // Save/Unsave a post
 router.post('/:id/save', protect, postController.toggleSavePost);
