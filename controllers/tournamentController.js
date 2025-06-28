@@ -21,35 +21,50 @@ const createTournament = async (req, res) => {
       endTime,
       maxPlayers = 100,
       gameId,
-      modesAvailable = ['Classic']
+      modesAvailable = ['Classic'],
+      status = 'upcoming'
     } = req.body;
 
     // Handle banner image upload if present
-    let bannerImage = {};
+    let bannerImage = '';
     if (req.file) {
+      console.log('File received for upload:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        buffer: req.file.buffer ? 'Buffer exists' : 'No buffer'
+      });
+
       if (isCloudinaryAvailable) {
+        console.log('Cloudinary is available, attempting upload...');
         try {
           // Upload the file buffer directly to Cloudinary
           const result = await uploadToCloudinary(req.file.buffer, 'tournament-banners');
-          bannerImage = {
-            url: result.url,
-            publicId: result.publicId
-          };
-        } catch (error) {
-          console.error('Error uploading banner to Cloudinary:', error);
+          
+          if (!result || (!result.secure_url && !result.url)) {
+            throw new Error('Invalid response from Cloudinary: No URL returned');
+          }
+          
+          bannerImage = result.secure_url || result.url;
+          console.log('Successfully uploaded to Cloudinary:', bannerImage);
+        } catch (uploadError) {
+          console.error('Error uploading to Cloudinary:', {
+            error: uploadError.message,
+            stack: uploadError.stack
+          });
           return res.status(500).json({
             success: false,
-            message: 'Failed to upload banner image',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'Failed to upload banner image to Cloudinary',
+            error: process.env.NODE_ENV === 'development' ? uploadError.message : undefined,
+            details: process.env.NODE_ENV === 'development' ? {
+              error: uploadError.message,
+              stack: uploadError.stack
+            } : undefined
           });
         }
       } else {
-        // If Cloudinary is not available, store a message or use a placeholder
-        bannerImage = {
-          url: 'https://via.placeholder.com/800x300?text=No+Banner+Available',
-          publicId: 'no-banner-available',
-          note: 'Cloudinary service not available'
-        };
+        console.warn('Cloudinary is not available, using placeholder image');
+        bannerImage = 'https://via.placeholder.com/800x300?text=No+Banner+Available';
       }
     }
 
@@ -104,7 +119,7 @@ const createTournament = async (req, res) => {
       game: gameId,
       modesAvailable,
       tournamentCode,
-      status: 'upcoming',
+      status,
       currentPlayers: [],
       leaderboard: []
     });
@@ -197,43 +212,43 @@ const updateTournament = async (req, res) => {
 
     // Handle banner image upload if present
     if (req.file) {
-      // First get the current tournament to delete old image if exists
-      const currentTournament = await Tournament.findById(id);
-      
+      console.log('File received for upload:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        buffer: req.file.buffer ? 'Buffer exists' : 'No buffer'
+      });
+
       if (isCloudinaryAvailable) {
+        console.log('Cloudinary is available, attempting upload...');
         try {
           // Upload the file buffer directly to Cloudinary
           const result = await uploadToCloudinary(req.file.buffer, 'tournament-banners');
           
-          // Delete old image from Cloudinary if it exists
-          if (currentTournament.bannerImage && currentTournament.bannerImage.publicId) {
-            try {
-              await deleteFromCloudinary(currentTournament.bannerImage.publicId);
-            } catch (deleteError) {
-              console.error('Error deleting old banner from Cloudinary:', deleteError);
-              // Continue with the update even if deletion fails
-            }
+          if (!result || (!result.secure_url && !result.url)) {
+            throw new Error('Invalid response from Cloudinary: No URL returned');
           }
           
-          updateData.bannerImage = {
-            url: result.url,
-            publicId: result.publicId
-          };
+          updateData.bannerImage = result.secure_url || result.url;
+          console.log('Successfully uploaded to Cloudinary:', updateData.bannerImage);
         } catch (uploadError) {
-          console.error('Error uploading new banner to Cloudinary:', uploadError);
+          console.error('Error uploading to Cloudinary:', {
+            error: uploadError.message,
+            stack: uploadError.stack
+          });
           return res.status(500).json({
             success: false,
-            message: 'Failed to upload banner image',
-            error: process.env.NODE_ENV === 'development' ? uploadError.message : undefined
+            message: 'Failed to upload banner image to Cloudinary',
+            error: process.env.NODE_ENV === 'development' ? uploadError.message : undefined,
+            details: process.env.NODE_ENV === 'development' ? {
+              error: uploadError.message,
+              stack: uploadError.stack
+            } : undefined
           });
         }
       } else {
-        // If Cloudinary is not available, use a placeholder
-        updateData.bannerImage = {
-          url: 'https://via.placeholder.com/800x300?text=No+Banner+Available',
-          publicId: 'no-banner-available',
-          note: 'Cloudinary service not available'
-        };
+        console.warn('Cloudinary is not available, using placeholder image');
+        updateData.bannerImage = 'https://via.placeholder.com/800x300?text=No+Banner+Available';
       }
     }
 
@@ -404,11 +419,49 @@ const registerPlayer = async (req, res) => {
   }
 };
 
+// Get leaderboard for a tournament
+const getTournamentLeaderboard = async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const tournament = await Tournament.findById(tournamentId);
+    if (!tournament) {
+      return res.status(404).json({ success: false, message: 'Tournament not found' });
+    }
+    // Leaderboard is an array of { playerId, username, totalWins, totalGames, winRate, totalCoinsEarned, rank }
+    const leaderboard = tournament.leaderboard || [];
+    let currentUserRank = null;
+    let userId = null;
+    if (req.user) {
+      userId = req.user._id?.toString() || req.user.id || null;
+      if (userId) {
+        const index = leaderboard.findIndex(item => (item.playerId?.toString?.() || item.playerId) === userId);
+        if (index !== -1) {
+          currentUserRank = {
+            rank: leaderboard[index].rank || index + 1,
+            ...leaderboard[index]
+          };
+        }
+      }
+    }
+    res.json({
+      success: true,
+      leaderboard,
+      currentUserRank,
+      tournamentName: tournament.name,
+      bannerImageUrl: tournament.bannerImage || null
+    });
+  } catch (error) {
+    console.error('Error fetching tournament leaderboard:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch leaderboard', error: error.message });
+  }
+};
+
 export {
   createTournament,
   getTournaments,
   getTournamentById,
   updateTournament,
   deleteTournament,
-  registerPlayer
+  registerPlayer,
+  getTournamentLeaderboard
 };

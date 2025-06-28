@@ -51,14 +51,8 @@ const tournamentSchema = new mongoose.Schema({
     default: 'solo'
   },
   bannerImage: {
-    url: {
-      type: String,
-      default: ''
-    },
-    publicId: {
-      type: String,
-      default: ''
-    }
+    type: String,
+    default: ''
   },
   type: {
     type: String,
@@ -104,7 +98,7 @@ const tournamentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['upcoming', 'ongoing', 'completed', 'cancelled'],
+    enum: ['upcoming', 'live', 'completed', 'cancelled'],
     default: 'upcoming'
   },
   startTime: {
