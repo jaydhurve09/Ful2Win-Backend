@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import Post from '../models/Post.js';
 import User from '../models/User.js';
+import { uploadToCloudinary } from '../config/cloudinary.js';
 
 /**
  * @desc    Create a new post
@@ -9,41 +10,89 @@ import User from '../models/User.js';
  */
 const createPost = async (req, res) => {
   try {
-    const { content, tags } = req.body;
+    console.log('createPost called with body:', req.body);
+    console.log('Files:', req.files);
+    console.log('File:', req.file);
+    
+    const { content, data } = req.body;
     const author = req.user.id; // Get user ID from auth middleware
+    let tags = [];
+    
+    // Parse additional data if sent as JSON string
+    if (data) {
+      try {
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        if (parsedData.tags) {
+          tags = Array.isArray(parsedData.tags) 
+            ? parsedData.tags 
+            : parsedData.tags.split(',').map(tag => tag.trim());
+        }
+      } catch (e) {
+        console.error('Error parsing data:', e);
+      }
+    }
 
     // Validate required fields
-    if (!content) {
-      return res.status(400).json({ message: 'Content is required' });
+    if (!content && !(req.file || req.files?.media)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Content or media is required' 
+      });
     }
 
     // Create post data object
     const postData = {
-      title: content.substring(0, 50) + (content.length > 50 ? '...' : ''), // Auto-generate title from content
-      content,
+      title: content ? content.substring(0, 50) + (content.length > 50 ? '...' : '') : 'New Post',
+      content: content || '',
       author,
-      tags: tags ? tags.split(',').map(tag => tag.trim()) : []
+      tags
     };
 
     // Handle file upload if present
-    if (req.file) {
+    const file = req.file || (req.files && req.files.media);
+    if (file) {
       try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          folder: "posts",
-          use_filename: true,
-          unique_filename: false,
+        console.log('Processing file upload:', {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
         });
         
-        // Add image to post data
-        postData.images = [{
-          url: result.secure_url,
-          publicId: result.public_id,
-          width: result.width,
-          height: result.height
-        }];
+        // Convert buffer to data URI for Cloudinary
+        const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        
+        // Upload to Cloudinary using the configured function
+        const result = await uploadToCloudinary(dataUri, 'posts');
+        console.log('Cloudinary upload result:', result);
+        
+        if (result && result.secure_url) {
+          postData.media = {
+            url: result.secure_url,
+            publicId: result.public_id,
+            resourceType: result.resource_type || 'image',
+            format: result.format,
+            width: result.width,
+            height: result.height,
+            duration: result.duration
+          };
+          
+          // For backward compatibility, also set the images array
+          if (result.resource_type === 'image') {
+            postData.images = [{
+              url: result.secure_url,
+              publicId: result.public_id,
+              width: result.width,
+              height: result.height
+            }];
+          }
+        }
       } catch (uploadError) {
-        console.error('Error uploading media:', uploadError);
-        return res.status(500).json({ message: 'Error uploading media' });
+        console.error('Error uploading media to Cloudinary:', uploadError);
+        return res.status(500).json({ 
+          success: false,
+          message: 'Error uploading media',
+          error: uploadError.message 
+        });
       }
     }
 
@@ -144,35 +193,59 @@ const deletePost = async (req, res) => {
 }
 
 /**
- * @desc    Like a post
- * @route   POST /api/posts/like
+ * @desc    Like or unlike a post
+ * @route   POST /api/posts/:id/like
  * @access  Private
  */
 const likePost = async (req, res) => {
   try {
-    const { postId, userId } = req.body;
+    const postId = req.params.id;
+    const userId = req.user.id; // Get user ID from auth middleware
+    
     // Find the post by ID
     const post = await Post.findById(postId);
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Post not found" 
+      });
     }
 
     // Check if the user has already liked the post
-    if (post.likes.includes(userId)) {
-      return res.status(400).json({ message: "You have already liked this post" });
+    const likeIndex = post.likes.indexOf(userId);
+    let action = '';
+    
+    if (likeIndex === -1) {
+      // Add like
+      post.likes.push(userId);
+      action = 'liked';
+    } else {
+      // Remove like
+      post.likes.splice(likeIndex, 1);
+      action = 'unliked';
     }
 
-    // Add the user ID to the likes array
-    post.likes.push(userId);
     // Save the updated post
     const updatedPost = await post.save();
+    
+    // Populate necessary fields for response
+    await updatedPost.populate('author', 'username name profilePicture');
+
     res.status(200).json({
-      message: "Post liked successfully",
-      post: updatedPost,
+      success: true,
+      message: `Post ${action} successfully`,
+      data: {
+        _id: updatedPost._id,
+        likes: updatedPost.likes,
+        likeCount: updatedPost.likes.length
+      }
     });
   } catch (error) {
-    console.error("Error liking post:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error toggling post like:", error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message || "Internal server error" 
+    });
   }
 }
 
