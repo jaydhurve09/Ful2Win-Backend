@@ -22,6 +22,7 @@ router.post('/login', loginUser);
 router.post('/logout', logoutUser);
 router.get('/check-username', checkUsername);
 
+
 // Test endpoint to check request body parsing
 router.post('/test-body', (req, res) => {
   console.log('=== Test Body Endpoint ===');

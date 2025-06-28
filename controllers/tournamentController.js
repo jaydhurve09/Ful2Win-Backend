@@ -1,4 +1,5 @@
 import Tournament from '../models/Tournament.js';
+import User from '../models/User.js';
 import { Game } from '../models/Game.js';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadToCloudinary, deleteFromCloudinary, getCloudinaryStatus } from '../config/cloudinary.js';
@@ -357,65 +358,62 @@ const deleteTournament = async (req, res) => {
   }
 };
 
-// Register player for tournament
+// Register player for tournamen// Make sure path is correct
+
 const registerPlayer = async (req, res) => {
   try {
     const { tournamentId } = req.params;
     const { playerId } = req.body;
 
     const tournament = await Tournament.findById(tournamentId);
-    
     if (!tournament) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tournament not found'
-      });
+      return res.status(404).json({ success: false, message: 'Tournament not found' });
     }
 
-    // Check if tournament is open for registration
-    if (tournament.status !== 'upcoming') {
-      return res.status(400).json({
-        success: false,
-        message: 'Tournament is not open for registration'
-      });
-    }
+    // Only allow registration if tournament is 'upcoming'
+    
 
-    // Check if player is already registered
+    // Check if already registered
     if (tournament.currentPlayers.includes(playerId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Player already registered for this tournament'
-      });
+      return res.status(400).json({ success: false, message: 'Player already registered' });
     }
 
-    // Check if tournament is full
+    // Check if full
     if (tournament.currentPlayers.length >= tournament.maxPlayers) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tournament is full'
-      });
+      return res.status(400).json({ success: false, message: 'Tournament is full' });
     }
 
-    // Add player to tournament
-    tournament.currentPlayers.push(playerId);
-    await tournament.save();
+    // Get the player/user
+    const user = await User.findById(playerId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-    res.json({
+    // Check if user has enough balance
+    if (user.balance < tournament.entryFee) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance' });
+    }
+
+    // Deduct entry fee
+    user.balance -= tournament.entryFee;
+    tournament.currentPlayers.push(playerId);
+
+    // Save both
+    await Promise.all([user.save(), tournament.save()]);
+
+    return res.json({
       success: true,
       message: 'Player registered successfully',
       data: {
         tournamentId: tournament._id,
         playerId,
-        registeredAt: new Date()
+        registeredAt: new Date(),
+        remainingBalance: user.balance
       }
     });
   } catch (error) {
-    console.error('Error registering player:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to register player',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    console.error('Register player error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 

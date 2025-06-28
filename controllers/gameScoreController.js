@@ -1,50 +1,74 @@
 import scoreModel from "../models/Score.js";
+import Tournament from "../models/Tournament.js";
 
 
- const gameScore =  async (req, res) => {
-    try {
-      const { userId,userName ,score, roomId, gameName } = req.body;
-      console.log("Received score submission:", req.body);
+ const gameScore = async (req, res) => {
+  try {
+    const { userId, userName, score, roomId, gameName } = req.body;
+    console.log("Received score submission:", req.body);
 
-      if (!userId || score === undefined || score === null || !roomId || !gameName) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-      //firstcheck user alredy play this room  or not
-      const existingScore = await scoreModel.findOne({ userId , roomId, gameName });
-      if (existingScore) {
-        console.log("User has already played this room, updating score.");
-        // If the user has already played this room, check if the new score is higher
-        //check username if not present then update it
-        if (!existingScore.username) {
-          existingScore.username = userName; // Update username if not set
-          await existingScore.save();
-        }
-        if (score > existingScore.score) {
-
-          existingScore.score = score; // Update the score if the new one is higher
-          await existingScore.save();
-          return res.status(200).json({ message: "Score updated successfully", score: existingScore });
-        }
-        return res.status(200).json({ message: "Score not updated, existing score is higher or equal", score: existingScore });
-      }
-        
-
-
-      const newScore = new scoreModel({
-        userId,
-        username: userName, // Assuming userName is passed in the request body
-        score,
-        roomId,
-        gameName
-      });
-
-      await newScore.save();
-      return res.status(201).json({ message: "Score saved successfully", score: newScore });
-    } catch (error) {
-      console.error("Error saving score:", error);
-      return res.status(500).json({ message: "Internal server error" });
+    if (!userId || score === undefined || score === null || !roomId || !gameName) {
+      return res.status(400).json({ message: "All fields are required" });
     }
+
+    // Step 1: Auto-register if not already registered
+    const tournament = await Tournament.findById(roomId);
+    if (!tournament) {
+      return res.status(404).json({ message: "Tournament not found" });
+    }
+
+    if (!tournament.currentPlayers.includes(userId)) {
+      if (
+        (tournament.status === 'upcoming' || tournament.status === 'live') &&
+        tournament.currentPlayers.length < tournament.maxPlayers
+      ) {
+        await Tournament.updateOne(
+          { _id: roomId },
+          { $addToSet: { currentPlayers: userId } }
+        );
+        console.log(`Auto-registered user ${userId} to tournament ${roomId}`);
+      } else {
+        return res.status(400).json({ message: "Cannot auto-register: Tournament is either completed or full." });
+      }
+    }
+
+    // Step 2: Check if the user already submitted a score
+    const existingScore = await scoreModel.findOne({ userId, roomId, gameName });
+    if (existingScore) {
+      console.log("User has already played this room, updating score.");
+
+      if (!existingScore.username) {
+        existingScore.username = userName;
+        await existingScore.save();
+      }
+
+      if (score > existingScore.score) {
+        existingScore.score = score;
+        await existingScore.save();
+        return res.status(200).json({ message: "Score updated successfully", score: existingScore });
+      }
+
+      return res.status(200).json({ message: "Score not updated, existing score is higher or equal", score: existingScore });
+    }
+
+    // Step 3: New score submission
+    const newScore = new scoreModel({
+      userId,
+      username: userName,
+      score,
+      roomId,
+      gameName
+    });
+
+    await newScore.save();
+    return res.status(201).json({ message: "Score saved successfully", score: newScore });
+
+  } catch (error) {
+    console.error("Error saving score:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
+};
+
 //update score
 const MyScore = async (req, res) => {
     try {
