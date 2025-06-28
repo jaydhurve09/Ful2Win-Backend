@@ -51,14 +51,8 @@ const tournamentSchema = new mongoose.Schema({
     default: 'solo'
   },
   bannerImage: {
-    url: {
-      type: String,
-      default: ''
-    },
-    publicId: {
-      type: String,
-      default: ''
-    }
+    type: String,
+    default: ''
   },
   type: {
     type: String,
