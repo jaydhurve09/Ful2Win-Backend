@@ -10,32 +10,61 @@ import { uploadToCloudinary } from '../config/cloudinary.js';
  */
 const createPost = async (req, res) => {
   try {
-    const { content, tags } = req.body;
+    console.log('createPost called with body:', req.body);
+    console.log('Files:', req.files);
+    console.log('File:', req.file);
+    
+    const { content, data } = req.body;
     const author = req.user.id; // Get user ID from auth middleware
+    let tags = [];
+    
+    // Parse additional data if sent as JSON string
+    if (data) {
+      try {
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        if (parsedData.tags) {
+          tags = Array.isArray(parsedData.tags) 
+            ? parsedData.tags 
+            : parsedData.tags.split(',').map(tag => tag.trim());
+        }
+      } catch (e) {
+        console.error('Error parsing data:', e);
+      }
+    }
 
     // Validate required fields
-    if (!content) {
-      return res.status(400).json({ message: 'Content is required' });
+    if (!content && !(req.file || req.files?.media)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Content or media is required' 
+      });
     }
 
     // Create post data object
     const postData = {
-      title: content.substring(0, 50) + (content.length > 50 ? '...' : ''), // Auto-generate title from content
-      content,
+      title: content ? content.substring(0, 50) + (content.length > 50 ? '...' : '') : 'New Post',
+      content: content || '',
       author,
-      tags: tags ? tags.split(',').map(tag => tag.trim()) : []
+      tags
     };
 
     // Handle file upload if present
-    if (req.file) {
+    const file = req.file || (req.files && req.files.media);
+    if (file) {
       try {
+        console.log('Processing file upload:', {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
+        });
+        
         // Convert buffer to data URI for Cloudinary
-        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
         
         // Upload to Cloudinary using the configured function
         const result = await uploadToCloudinary(dataUri, 'posts');
+        console.log('Cloudinary upload result:', result);
         
-        // Add media to post data based on resource type
         if (result && result.secure_url) {
           postData.media = {
             url: result.secure_url,
@@ -164,35 +193,59 @@ const deletePost = async (req, res) => {
 }
 
 /**
- * @desc    Like a post
- * @route   POST /api/posts/like
+ * @desc    Like or unlike a post
+ * @route   POST /api/posts/:id/like
  * @access  Private
  */
 const likePost = async (req, res) => {
   try {
-    const { postId, userId } = req.body;
+    const postId = req.params.id;
+    const userId = req.user.id; // Get user ID from auth middleware
+    
     // Find the post by ID
     const post = await Post.findById(postId);
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Post not found" 
+      });
     }
 
     // Check if the user has already liked the post
-    if (post.likes.includes(userId)) {
-      return res.status(400).json({ message: "You have already liked this post" });
+    const likeIndex = post.likes.indexOf(userId);
+    let action = '';
+    
+    if (likeIndex === -1) {
+      // Add like
+      post.likes.push(userId);
+      action = 'liked';
+    } else {
+      // Remove like
+      post.likes.splice(likeIndex, 1);
+      action = 'unliked';
     }
 
-    // Add the user ID to the likes array
-    post.likes.push(userId);
     // Save the updated post
     const updatedPost = await post.save();
+    
+    // Populate necessary fields for response
+    await updatedPost.populate('author', 'username name profilePicture');
+
     res.status(200).json({
-      message: "Post liked successfully",
-      post: updatedPost,
+      success: true,
+      message: `Post ${action} successfully`,
+      data: {
+        _id: updatedPost._id,
+        likes: updatedPost.likes,
+        likeCount: updatedPost.likes.length
+      }
     });
   } catch (error) {
-    console.error("Error liking post:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error toggling post like:", error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message || "Internal server error" 
+    });
   }
 }
 
