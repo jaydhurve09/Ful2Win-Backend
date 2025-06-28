@@ -12,7 +12,7 @@ import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
-// import walletRoutes from './routes/walletRoutes.js';
+ //import walletRoute from './routes/walletRoutes.js';
 // import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -253,6 +253,7 @@ app.use((err, req, res, next) => {
 });
 
 // API Routes
+
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
@@ -262,6 +263,7 @@ app.use('/api/score', Gamerouter); // Add the new game route
 // Webhook routes (no body parsing for webhook verification)
 // app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', authRoutes);
+//app.use('/api/wallet', walletRoute); // Add wallet routes
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
