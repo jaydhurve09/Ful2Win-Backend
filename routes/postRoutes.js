@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, admin, ownerOrAdmin } from '../middleware/authMiddleware.js';
-import { upload as uploadPostMedia, handleMulterError } from '../middleware/uploadMiddleware.js';
+import { upload, handleMulterError } from '../middleware/uploadMiddleware.js';
 import Post from '../models/Post.js';
 
 const router = express.Router();
@@ -13,8 +13,8 @@ router.post(
   '/',
   protect,
   (req, res, next) => {
-    // Use the upload middleware (handles both with and without files)
-    uploadPostMedia.single('media')(req, res, (err) => {
+    // Use the upload middleware with memory storage for Cloudinary
+    upload.single('media')(req, res, (err) => {
       if (err) {
         return handleMulterError(err, req, res, next);
       }

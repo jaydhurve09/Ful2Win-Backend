@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import Post from '../models/Post.js';
 import User from '../models/User.js';
+import { uploadToCloudinary } from '../config/cloudinary.js';
 
 /**
  * @desc    Create a new post
@@ -28,22 +29,41 @@ const createPost = async (req, res) => {
     // Handle file upload if present
     if (req.file) {
       try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          folder: "posts",
-          use_filename: true,
-          unique_filename: false,
-        });
+        // Convert buffer to data URI for Cloudinary
+        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         
-        // Add image to post data
-        postData.images = [{
-          url: result.secure_url,
-          publicId: result.public_id,
-          width: result.width,
-          height: result.height
-        }];
+        // Upload to Cloudinary using the configured function
+        const result = await uploadToCloudinary(dataUri, 'posts');
+        
+        // Add media to post data based on resource type
+        if (result && result.secure_url) {
+          postData.media = {
+            url: result.secure_url,
+            publicId: result.public_id,
+            resourceType: result.resource_type || 'image',
+            format: result.format,
+            width: result.width,
+            height: result.height,
+            duration: result.duration
+          };
+          
+          // For backward compatibility, also set the images array
+          if (result.resource_type === 'image') {
+            postData.images = [{
+              url: result.secure_url,
+              publicId: result.public_id,
+              width: result.width,
+              height: result.height
+            }];
+          }
+        }
       } catch (uploadError) {
-        console.error('Error uploading media:', uploadError);
-        return res.status(500).json({ message: 'Error uploading media' });
+        console.error('Error uploading media to Cloudinary:', uploadError);
+        return res.status(500).json({ 
+          success: false,
+          message: 'Error uploading media',
+          error: uploadError.message 
+        });
       }
     }
 

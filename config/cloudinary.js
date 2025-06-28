@@ -100,10 +100,24 @@ const uploadToCloudinary = async (file, folder = 'tournaments') => {
       throw new Error('Invalid file type. Must be a file path, Buffer, or data URI');
     }
     
-    console.log('[Cloudinary] Upload successful:', result.secure_url);
-    return {
+    console.log('[Cloudinary] Upload successful:', {
       url: result.secure_url,
-      publicId: result.public_id
+      publicId: result.public_id,
+      resourceType: result.resource_type,
+      format: result.format,
+      width: result.width,
+      height: result.height,
+      duration: result.duration
+    });
+    
+    return {
+      secure_url: result.secure_url,
+      public_id: result.public_id,
+      resource_type: result.resource_type,
+      format: result.format,
+      width: result.width,
+      height: result.height,
+      duration: result.duration
     };
   } catch (error) {
     console.error('[Cloudinary] Upload error:', error.message);

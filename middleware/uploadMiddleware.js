@@ -31,12 +31,28 @@ const storage = multer.diskStorage({
   }
 });
 
-// Allowed file types with MIME types
+// Allowed file types with MIME types and extensions
 const allowedFileTypes = {
+  // Images
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
   'image/png': 'png',
-  'image/gif': 'gif'
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  // Videos
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'video/quicktime': 'mov',
+  'video/x-msvideo': 'avi',
+  'video/x-ms-wmv': 'wmv',
+  'video/x-matroska': 'mkv'
+};
+
+// Maximum file sizes (in bytes)
+const MAX_FILE_SIZES = {
+  'image': 5 * 1024 * 1024,      // 5MB for images
+  'video': 50 * 1024 * 1024,     // 50MB for videos
+  'default': 10 * 1024 * 1024    // 10MB default
 };
 
 // File filter for allowed file types
@@ -45,23 +61,38 @@ const fileFilter = (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
     const mimeType = file.mimetype;
     
+    // Get the expected extension for this MIME type
+    const expectedExt = allowedFileTypes[mimeType];
+    
     // Check if the file type is allowed
-    if (!(mimeType in allowedFileTypes)) {
-      return cb(new Error(`Invalid file type. Only ${Object.keys(allowedFileTypes).join(', ')} are allowed.`), false);
+    if (!expectedExt) {
+      return cb(new Error(`Invalid file type. Only images and videos are allowed.`), false);
     }
     
-    // Check file extension matches the MIME type
-    if (allowedFileTypes[mimeType] !== ext) {
-      return cb(new Error(`File extension doesn't match the file type.`), false);
+    // Check if the file extension is one of the allowed extensions for this MIME type
+    const allowedExtensions = Object.entries(allowedFileTypes)
+      .filter(([_, ext]) => ext === expectedExt)
+      .map(([mime]) => mime.split('/').pop());
+    
+    // Get file type category (image or video)
+    const fileTypeCategory = mimeType.split('/')[0];
+    
+    // Check if the file extension is allowed
+    if (!allowedExtensions.some(ext => file.originalname.toLowerCase().endsWith(`.${ext}`))) {
+      return cb(new Error(`Invalid file extension for ${fileTypeCategory}. Allowed extensions: ${allowedExtensions.join(', ')}`), false);
     }
     
-    // Check file size (in bytes)
-    if (file.size > 5 * 1024 * 1024) { // 5MB
-      return cb(new Error('File size exceeds the limit of 5MB'), false);
+    // Check file size based on file type
+    const maxSize = MAX_FILE_SIZES[fileTypeCategory] || MAX_FILE_SIZES['default'];
+    
+    // Check file size
+    if (file.size > maxSize) {
+      const maxSizeMB = maxSize / (1024 * 1024);
+      return cb(new Error(`File size exceeds the limit of ${maxSizeMB}MB for ${fileTypeCategory}s`), false);
     }
     
     // Check for potential security issues
-    if (file.originalname.match(/\.(php|exe|sh|bat|cmd|js|html?|css)$/i)) {
+    if (file.originalname.match(/\.(php|exe|sh|bat|cmd|js|html?|css|jar|war|ear|apk|msi|dll|so|a|o|py|rb|pl|pm|t|pod|rdf|xml|xsd|xslt|xsl|rss|atom|json|jsonp|webmanifest|htaccess|htpasswd|ini|log|conf|cfg|reg|cmd|bat|vbs|ps1|psm1|psd1|ps1xml|psc1|pssc|cdxml|wsf|wsc|ws|wsh|msh|msh1|msh2|msh3|msh4|msh5|msh6|msh7|msh8|msh9|mshxml|msh1xml|msh2xml|msh3xml|msh4xml|msh5xml|msh6xml|msh7xml|msh8xml|msh9xml|msc1|msc2|msh1|msh2|msh3|msh4|msh5|msh6|msh7|msh8|msh9|mshxml|msh1xml|msh2xml|msh3xml|msh4xml|msh5xml|msh6xml|msh7xml|msh8xml|msh9xml|msc1|msc2)$/i)) {
       return cb(new Error('Potentially malicious file detected'), false);
     }
     
@@ -115,23 +146,45 @@ const handleMulterError = (err, req, res, next) => {
 // Initialize multer with memory storage for Cloudinary
 const memoryStorage = multer.memoryStorage();
 
-// File filter for allowed file types
-const imageFileFilter = (req, file, cb) => {
-  // Accept images only
-  if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
-    return cb(new Error('Only image files (jpg, jpeg, png, gif) are allowed!'), false);
+// File filter for media uploads (images and videos)
+const mediaFileFilter = (req, file, cb) => {
+  const fileType = file.mimetype.split('/')[0];
+  
+  // Accept images and videos
+  if (!['image', 'video'].includes(fileType)) {
+    return cb(new Error('Only image and video files are allowed!'), false);
   }
-  cb(null, true);
+  
+  // For now, accept all image and video files and let Cloudinary handle the validation
+  // We'll still check file size and basic security
+  try {
+    // Check file size (5MB for images, 50MB for videos)
+    const maxSize = fileType === 'image' ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return cb(new Error(`File is too large. Maximum size is ${maxSize / (1024 * 1024)}MB for ${fileType}s`), false);
+    }
+    
+    // Basic security check for executable files
+    if (file.originalname.match(/\.(php|exe|sh|bat|cmd|js|html?|css|jar|war|ear|apk|msi|dll|so|a|o|py|rb|pl|pm|t|pod|rdf|xml|xsd|xslt|xsl|rss|atom|json|jsonp|webmanifest|htaccess|htpasswd|ini|log|conf|cfg|reg|cmd|bat|vbs|ps1|psm1|psd1|ps1xml|psc1|pssc|cdxml|wsf|wsc|ws|wsh|msh|msh1|msh2|msh3|msh4|msh5|msh6|msh7|msh8|msh9|mshxml|msh1xml|msh2xml|msh3xml|msh4xml|msh5xml|msh6xml|msh7xml|msh8xml|msh9xml|msc1|msc2|msh1|msh2|msh3|msh4|msh5|msh6|msh7|msh8|msh9|mshxml|msh1xml|msh2xml|msh3xml|msh4xml|msh5xml|msh6xml|msh7xml|msh8xml|msh9xml|msc1|msc2)$/i)) {
+      return cb(new Error('Potentially malicious file detected'), false);
+    }
+    
+    return cb(null, true);
+  } catch (error) {
+    console.error('Error in media file filter:', error);
+    return cb(error, false);
+  }
 };
 
-// Initialize multer with configuration for multiple files
+// Initialize multer with configuration for media uploads
 const upload = multer({
   storage: memoryStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per file
-    files: 2 // Allow up to 2 files (thumbnail and coverImage)
+    fileSize: 50 * 1024 * 1024, // 50MB max file size (for videos)
+    files: 10, // Allow multiple files per upload
+    fieldSize: 100 * 1024 * 1024, // 100MB max for form data
   },
-  fileFilter: imageFileFilter
+  fileFilter: mediaFileFilter
 });
 
 // Middleware for handling single file upload
