@@ -15,26 +15,27 @@ const GAME_TYPES = [
 ];
 
 const GAME_MODES = [
-  'Tournament',
-  'Classic',
-  'Quick',
-  'Private'
+  'tournament',
+  'classic',
+  'private',
+  'practise'
 ];
 
 // Game schema
 const gameSchema = new mongoose.Schema({
-  // Unique name identifier (e.g., 'snake-ladder', 'rummy')
-  name: {
+  // Unique game identifier (e.g., 'snake-ladder', 'rummy')
+  gameId: {
     type: String,
     required: true,
     unique: true,
     trim: true,
     lowercase: true,
-    match: /^[a-z0-9-]+$/
+    match: /^[a-z0-9-]+$/,
+    index: true
   },
   
-  // Display name (e.g., 'Snake & Ladder', 'Rummy')
-  displayName: {
+  // Display name shown to users (e.g., 'Snake & Ladder', 'Rummy')
+  name: {
     type: String,
     required: true,
     trim: true
@@ -448,12 +449,13 @@ gameSchema.methods.addVersion = function(version, changes) {
 
 // Pre-save hook to generate slug
 gameSchema.pre('save', function(next) {
-  if (this.isModified('displayName') && !this.metadata.slug) {
-    this.metadata.slug = this.displayName
+  if (this.isModified('name') && (!this.metadata || !this.metadata.slug)) {
+    if (!this.metadata) this.metadata = {};
+    this.metadata.slug = this.name
       .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/--+/g, '-');
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-')     // Replace spaces with -
+      .replace(/-+/g, '-');     // Replace multiple - with single -
   }
   next();
 });

@@ -7,6 +7,17 @@ import { uploadToCloudinary, deleteFromCloudinary, getCloudinaryStatus } from '.
 // Check Cloudinary status
 const isCloudinaryAvailable = getCloudinaryStatus();
 
+// Helper function to generate tournament ID
+const generateTournamentId = (name) => {
+  if (!name) return '';
+  // Get first letters of each word and convert to uppercase
+  const letters = name.match(/\b\w/g) || [];
+  const prefix = letters.join('').toUpperCase();
+  // Add a random 4-digit number
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}${randomNum}`;
+};
+
 // Create a new tournament
 const createTournament = async (req, res) => {
   try {
@@ -23,8 +34,12 @@ const createTournament = async (req, res) => {
       maxPlayers = 100,
       gameId,
       modesAvailable = ['Classic'],
-      status = 'upcoming'
+      status = 'upcoming',
+      tournamentId
     } = req.body;
+
+    // Generate tournament ID if not provided
+    const generatedTournamentId = tournamentId || generateTournamentId(name);
 
     // Handle banner image upload if present
     let bannerImage = '';
@@ -105,6 +120,7 @@ const createTournament = async (req, res) => {
     // Create tournament code
     const tournamentCode = `TN-${uuidv4().substring(0, 8).toUpperCase()}`;
 
+    // Create new tournament
     const tournament = new Tournament({
       name,
       type,
@@ -116,13 +132,10 @@ const createTournament = async (req, res) => {
       startTime: new Date(startTime),
       endTime: endTime ? new Date(endTime) : null,
       maxPlayers,
-      bannerImage,
       game: gameId,
       modesAvailable,
-      tournamentCode,
       status,
-      currentPlayers: [],
-      leaderboard: []
+      tournamentId: generatedTournamentId
     });
 
     await tournament.save();
@@ -158,7 +171,7 @@ const getTournaments = async (req, res) => {
     if (type) filter.type = type;
 
     const tournaments = await Tournament.find(filter)
-      .populate('game', 'name displayName assets.thumbnail')
+      .populate('game', 'gameId name assets.thumbnail')
       .sort({ startTime: 1 });
 
     res.json({
@@ -180,7 +193,7 @@ const getTournaments = async (req, res) => {
 const getTournamentById = async (req, res) => {
   try {
     const tournament = await Tournament.findById(req.params.id)
-      .populate('game', 'name displayName assets.thumbnail')
+      .populate('game', 'gameId name assets.thumbnail')
       .populate('currentPlayers', 'username avatar')
       .populate('winners.playerId', 'username avatar');
 

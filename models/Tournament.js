@@ -32,7 +32,23 @@ const leaderboardEntrySchema = new mongoose.Schema({
   }
 });
 
+// Function to generate tournament ID from name
+const generateTournamentId = (name) => {
+  if (!name) return '';
+  // Get first letters of each word and convert to uppercase
+  const letters = name.match(/\b\w/g) || [];
+  const prefix = letters.join('').toUpperCase();
+  // Add a random 4-digit number
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}${randomNum}`;
+};
+
 const tournamentSchema = new mongoose.Schema({
+  tournamentId: {
+    type: String,
+    unique: true,
+    trim: true
+  },
   name: {
     type: String,
     required: true,
@@ -65,8 +81,8 @@ const tournamentSchema = new mongoose.Schema({
   },
   modesAvailable: [{
     type: String,
-    enum: ['Tournament', 'Classic', 'Private'],
-    default: ['Classic']
+    enum: ['tournament', 'classic', 'private', 'practise'],
+    default: ['classic']
   }],
   rating: {
     type: Number,
@@ -151,6 +167,14 @@ leaderboardEntrySchema.pre('save', function(next) {
 //   type: 'text' 
 // });
 
-const Tournament = mongoose.model('Tournament', tournamentSchema);
+// Pre-save hook to generate tournamentId
+const Tournament = tournamentSchema;
 
-export default Tournament;
+tournamentSchema.pre('save', function(next) {
+  if (!this.tournamentId) {
+    this.tournamentId = generateTournamentId(this.name);
+  }
+  next();
+});
+
+export default mongoose.model('Tournament', tournamentSchema);
