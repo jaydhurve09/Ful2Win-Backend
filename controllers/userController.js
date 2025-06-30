@@ -82,12 +82,12 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    console.log('\n=== Login Request ===');
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  //  console.log('\n=== Login Request ===');
+  //  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
     
     // Log request headers and body for debugging
-    console.log('Headers:', req.headers);
-    console.log('Raw body:', req.body);
+  //  console.log('Headers:', req.headers);
+  //  console.log('Raw body:', req.body);
     
     let requestBody = req.body;
     
@@ -107,11 +107,11 @@ const loginUser = async (req, res) => {
     const { phoneNumber, password } = requestBody;
     
     // Input validation
-    if (!phoneNumber || !password) {
-      console.log('Missing required fields:', { 
-        phoneNumber: !!phoneNumber, 
-        password: '***' 
-      });
+   if (!phoneNumber || !password) {
+    //  console.log('Missing required fields:', { 
+     //   phoneNumber: !!phoneNumber, 
+       // password: '***' 
+     // });
       
       return res.status(400).json({ 
         success: false,
@@ -133,7 +133,7 @@ const loginUser = async (req, res) => {
     }
 
     // Find user
-    console.log('Looking up user in database with phone number:', phoneNumber);
+   // console.log('Looking up user in database with phone number:', phoneNumber);
     const user = await User.findOne({ phoneNumber }).select('+password');
     
     if (!user) {
@@ -172,6 +172,7 @@ const loginUser = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: 'Login successful',
       token,
       data: user
     });
