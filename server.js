@@ -91,8 +91,8 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Add FRONTEND_URL if it exists
-if (process.env.FRONTEND_URL) {
-  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
+if (process.env.FRONTEND_URL || process.env.LOCAL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '') || process.env.LOCAL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
   }
