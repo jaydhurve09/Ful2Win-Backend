@@ -153,10 +153,6 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3398a50f2148f349c44930d0de4241f257500aca
 // Parse JSON for all routes except webhooks (webhooks need raw body for signature verification)
 // app.use((req, res, next) => {
 //   if (req.originalUrl.startsWith('/api/webhooks')) {
@@ -265,34 +261,18 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
-<<<<<<< HEAD
-
 
 // API Routes
-app.use('/api/posts', postRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/car-racing', carRacingRoute);
-app.use('/api/wallet', walletRoutes);
-//app.use('/api/webhooks', webhookRoutes);
-app.use('/api/referrals', referralRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
-
-=======
-
-// API Routes
-
-app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/car-racing', carRacingRoute);
 app.use('/api/score', Gamerouter); // Add the new game route
-// Webhook routes (no body parsing for webhook verification)
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
 // app.use('/api/webhooks', webhookRoutes);
-app.use('/api/auth', authRoutes);
-//app.use('/api/wallet', walletRoute); // Add wallet routes
->>>>>>> 3398a50f2148f349c44930d0de4241f257500aca
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
