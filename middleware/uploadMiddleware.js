@@ -188,16 +188,66 @@ const upload = multer({
 });
 
 // Middleware for handling single file upload
-export const uploadSingle = (fieldName) => {
+const uploadSingle = (fieldName) => {
   return (req, res, next) => {
-    const uploadSingle = upload.single(fieldName);
-    uploadSingle(req, res, (err) => {
-      if (err) {
-        return handleMulterError(err, req, res, next);
+    console.log(`[uploadSingle] Initializing upload for field: ${fieldName}`);
+    
+    const singleUpload = multer({
+      storage: memoryStorage,
+      fileFilter: mediaFileFilter,
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+        files: 1,
+        fields: 20, // Allow other form fields
+        parts: 30   // Total parts (files + fields)
       }
+    }).single(fieldName);
+
+    singleUpload(req, res, (err) => {
+      if (err) {
+        console.error('[uploadSingle] Upload error:', {
+          message: err.message,
+          code: err.code,
+          field: err.field,
+          storageErrors: err.storageErrors
+        });
+        
+        let errorMessage = 'Error uploading file';
+        let statusCode = 400;
+        
+        // Handle specific multer errors
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          errorMessage = 'File size too large. Maximum size is 5MB.';
+          statusCode = 413; // Payload Too Large
+        } else if (err.code === 'LIMIT_FILE_COUNT') {
+          errorMessage = 'Too many files. Only one file is allowed.';
+        } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          errorMessage = `Unexpected file field. Expected field name: ${fieldName}`;
+        }
+        
+        return res.status(statusCode).json({
+          success: false,
+          message: errorMessage,
+          code: err.code || 'UPLOAD_ERROR'
+        });
+      }
+      
+      // Log successful upload
+      if (req.file) {
+        console.log('[uploadSingle] File uploaded successfully:', {
+          fieldname: req.file.fieldname,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer'
+        });
+      } else {
+        console.log('[uploadSingle] No file was uploaded');
+      }
+      
       next();
     });
   };
 };
 
-export { upload, handleMulterError };
+export { upload, uploadSingle, handleMulterError };

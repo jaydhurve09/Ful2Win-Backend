@@ -92,41 +92,49 @@ router.get('/profile/:userId', getUserProfile);
  */
 router.put(
   '/profile/:userId', 
-  protect, // Ensure user is authenticated
+  protect,
+  uploadSingle('profilePicture'),
   (req, res, next) => {
-    // Log the incoming request headers
-    console.log('Request headers:', req.headers);
-    console.log('Content-Type header:', req.get('Content-Type'));
-    console.log('Content-Length header:', req.get('Content-Length'));
-    
-    // Check if the request is multipart
-    const isMultipart = req.is('multipart/form-data');
-    console.log('Is multipart request:', isMultipart);
-    
-    // Handle the file upload
-    uploadSingle('profilePicture')(req, res, (err) => {
-      if (err) {
-        console.error('File upload error:', err);
-        return res.status(400).json({
-          success: false,
-          message: err.message || 'Error uploading file'
-        });
+    try {
+      console.log('=== Profile Update Request ===');
+      console.log('Headers:', req.headers);
+      console.log('Content-Type:', req.get('Content-Type'));
+      console.log('Content-Length:', req.get('Content-Length'));
+      
+      // Parse JSON data from form fields if present
+      if (req.body.data) {
+        try {
+          const parsedData = JSON.parse(req.body.data);
+          req.body = { ...req.body, ...parsedData };
+          delete req.body.data;
+        } catch (e) {
+          console.error('Error parsing JSON data:', e);
+        }
       }
       
-      // Log file upload details
+      // Log file info if present
       if (req.file) {
         console.log('File uploaded successfully:', {
           fieldname: req.file.fieldname,
           originalname: req.file.originalname,
           mimetype: req.file.mimetype,
-          size: req.file.size
+          size: req.file.size,
+          hasBuffer: !!req.file.buffer,
+          bufferLength: req.file.buffer?.length || 0
         });
       } else {
-        console.log('No file was uploaded');
+        console.log('No file included in this request');
       }
       
       next();
-    });
+    } catch (error) {
+      console.error('Error in profile update middleware:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error processing request',
+        error: error.message
+      });
+    }
   },
   updateUserProfile
 );

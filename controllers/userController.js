@@ -1,8 +1,14 @@
 import fs from 'fs';
-import User from '../models/User.js';
-import Post from '../models/Post.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { v2 as cloudinary } from 'cloudinary';
 import mongoose from 'mongoose';
+import User from '../models/User.js';
+import Post from '../models/Post.js';
+
+// Create __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // @desc    Register a new user
 // @route   POST /api/users/register
@@ -257,34 +263,69 @@ const updateUserProfile = async (req, res) => {
   console.log('=== Update Profile Request ===');
   console.log('Params:', req.params);
   console.log('Headers:', req.headers);
-  console.log('Files:', {
-    file: req.file ? {
+  console.log('Request body:', req.body);
+  
+  // Log file info if present
+  if (req.file) {
+    console.log('Uploaded file info:', {
       fieldname: req.file.fieldname,
       originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
       buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer',
       encoding: req.file.encoding
-    } : 'No file',
-    files: req.files || 'No files'
+    });
+  } else {
+    console.log('No file was uploaded with this request');
+  }
+  
+  // Debug: Log environment info
+  console.log('Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    cwd: process.cwd(),
+    __dirname,
+    time: new Date().toISOString()
   });
   
-  // Log Cloudinary config (without sensitive data)
-  console.log('Cloudinary config:', {
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'set' : 'not set',
-    api_key: process.env.CLOUDINARY_API_KEY ? 'set' : 'not set',
-    api_secret: process.env.CLOUDINARY_API_SECRET ? 'set' : 'not set'
-  });
+  // Debug: Log Cloudinary config (without exposing secrets)
+  const cloudinaryConfig = {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'not configured',
+    api_key: process.env.CLOUDINARY_API_KEY ? 'configured' : 'not configured',
+    api_secret: process.env.CLOUDINARY_API_SECRET ? 'configured' : 'not configured'
+  };
+  console.log('Cloudinary config status:', cloudinaryConfig);
 
   try {
     const userId = req.params.userId;
     
+    // Validate user ID format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.error('Invalid user ID format:', userId);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format',
+        code: 'INVALID_USER_ID'
+      });
+    }
+    
     // Check if user exists and is authorized
     const currentUser = await User.findById(userId).select('-password -__v -refreshToken');
     if (!currentUser) {
+      console.error('User not found with ID:', userId);
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+    
+    // Check if the current user is authorized to update this profile
+    if (currentUser._id.toString() !== req.user.id && req.user.role !== 'admin') {
+      console.warn(`Unauthorized access attempt: User ${req.user.id} tried to update profile of user ${userId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this profile',
+        code: 'UNAUTHORIZED_ACCESS'
       });
     }
 
@@ -354,9 +395,14 @@ const updateUserProfile = async (req, res) => {
         mimetype: req.file.mimetype,
         size: req.file.size,
         hasBuffer: !!req.file.buffer,
+        bufferLength: req.file.buffer ? req.file.buffer.length : 0,
         fieldname: req.file.fieldname,
         encoding: req.file.encoding,
-        requestHeaders: req.headers
+        requestHeaders: {
+          'content-type': req.get('content-type'),
+          'content-length': req.get('content-length'),
+          'x-request-id': req.get('x-request-id')
+        }
       });
 
       // Validate file buffer
@@ -364,56 +410,124 @@ const updateUserProfile = async (req, res) => {
         console.error('Invalid or empty file buffer received');
         return res.status(400).json({
           success: false,
-          message: 'File upload failed: Invalid file data received.'
+          message: 'File upload failed: No file data received.',
+          code: 'NO_FILE_DATA',
+          details: 'The uploaded file appears to be empty or corrupted.'
+        });
+      }
+      
+      // Check if buffer contains valid image data
+      const isImage = req.file.mimetype.startsWith('image/');
+      if (!isImage) {
+        console.error('Uploaded file is not an image:', req.file.mimetype);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid file type. Only image files are allowed.',
+          code: 'INVALID_FILE_TYPE',
+          allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
         });
       }
       
       try {
-        // File type validation
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!allowedMimeTypes.includes(req.file.mimetype)) {
-          console.error('Invalid file type:', req.file.mimetype);
+        // File type validation with more specific error messages
+        const allowedMimeTypes = {
+          'image/jpeg': 'JPEG',
+          'image/png': 'PNG',
+          'image/gif': 'GIF',
+          'image/webp': 'WebP'
+        };
+        
+        if (!(req.file.mimetype in allowedMimeTypes)) {
+          const allowedTypes = Object.values(allowedMimeTypes).join(', ');
+          console.error('Invalid file type:', {
+            mimetype: req.file.mimetype,
+            allowed: Object.keys(allowedMimeTypes)
+          });
+          
           return res.status(400).json({ 
             success: false, 
-            message: 'Unsupported file type. Please upload an image file (JPEG, PNG, GIF, or WebP).' 
+            message: `Unsupported file type. Please upload an image file (${allowedTypes}).`,
+            code: 'INVALID_FILE_TYPE',
+            allowedTypes: Object.keys(allowedMimeTypes)
           });
         }
         
-        // File size check (5MB limit)
+        // File size check (5MB limit) with human-readable error
         const maxFileSize = 5 * 1024 * 1024; // 5MB
         if (req.file.size > maxFileSize) {
-          console.error('File size exceeds limit:', req.file.size, 'bytes');
+          const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+          console.error('File size exceeds limit:', {
+            size: req.file.size,
+            sizeMB: fileSizeMB,
+            maxSize: '5MB'
+          });
+          
           return res.status(400).json({ 
             success: false, 
-            message: 'File is too large. Maximum allowed size is 5MB.' 
+            message: `File is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`,
+            code: 'FILE_TOO_LARGE',
+            maxSize: maxFileSize,
+            actualSize: req.file.size
           });
         }
         
-        // Convert buffer to base64 for Cloudinary
-        const base64Data = req.file.buffer.toString('base64');
-        const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
+        console.log('Preparing to upload file to Cloudinary...');
         
         try {
-          // Upload to Cloudinary with error handling
+          // Convert buffer to base64 for Cloudinary
+          const base64Data = req.file.buffer.toString('base64');
+          const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
+          
+          // Log Cloudinary configuration (without sensitive data)
+          console.log('Cloudinary config:', {
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'missing',
+            folder: 'profiles',
+            transformation: '500x500 thumb, auto:good'
+          });
+          
+          // Upload to Cloudinary with detailed error handling
+          const uploadStartTime = Date.now();
           const uploadResult = await new Promise((resolve, reject) => {
+            const uploadOptions = {
+              folder: 'profiles',
+              use_filename: true,
+              unique_filename: true,
+              resource_type: 'auto',
+              transformation: [
+                { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
+                { quality: 'auto:good' }
+              ]
+            };
+            
+            console.log('Starting Cloudinary upload with options:', uploadOptions);
+            
             cloudinary.uploader.upload(
               dataUri,
-              {
-                folder: 'profiles',
-                use_filename: true,
-                unique_filename: true,
-                resource_type: 'auto',
-                transformation: [
-                  { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
-                  { quality: 'auto:good' }
-                ]
-              },
+              uploadOptions,
               (error, result) => {
+                const uploadTime = Date.now() - uploadStartTime;
                 if (error) {
-                  reject(new Error(`Cloudinary upload failed: ${error.message}`));
-                } else if (!result || !result.secure_url) {
-                  reject(new Error('Failed to get secure URL from Cloudinary'));
+                  console.error('Cloudinary upload failed after', uploadTime, 'ms:', {
+                    error: error.message,
+                    http_code: error.http_code,
+                    name: error.name,
+                    code: error.code
+                  });
+                  reject(new Error(`Failed to upload image to Cloudinary: ${error.message}`));
+                } else if (!result) {
+                  console.error('Cloudinary returned empty result after', uploadTime, 'ms');
+                  reject(new Error('Cloudinary upload returned no result'));
+                } else if (!result.secure_url) {
+                  console.error('Cloudinary response missing secure_url:', result);
+                  reject(new Error('Cloudinary response is missing the secure URL'));
                 } else {
+                  console.log('Cloudinary upload successful in', uploadTime, 'ms', {
+                    bytes: result.bytes,
+                    format: result.format,
+                    width: result.width,
+                    height: result.height,
+                    url: result.secure_url.substring(0, 60) + '...'
+                  });
                   resolve(result);
                 }
               }
@@ -427,10 +541,25 @@ const updateUserProfile = async (req, res) => {
           if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary.com')) {
             try {
               const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
-              await cloudinary.uploader.destroy(`profiles/${publicId}`);
+              console.log('Deleting old profile picture with public ID:', publicId);
+              
+              const deleteResult = await cloudinary.uploader.destroy(`profiles/${publicId}`, {
+                invalidate: true
+              });
+              
+              console.log('Old profile picture deletion result:', {
+                result: deleteResult.result,
+                wasDeleted: deleteResult.result === 'ok',
+                publicId: publicId
+              });
+              
             } catch (deleteError) {
-              // Don't fail the request if deletion of old image fails
-              console.error('Error deleting old profile picture (non-critical):', deleteError.message);
+              // Don't fail the request if deletion of old image fails, but log it
+              console.error('Error deleting old profile picture (non-critical):', {
+                error: deleteError.message,
+                profilePicture: currentUser.profilePicture,
+                userId: currentUser._id
+              });
             }
           }
         } catch (cloudinaryError) {
@@ -471,35 +600,114 @@ const updateUserProfile = async (req, res) => {
       });
     }
     
-    // Find and update the user
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updatesToApply },
-      { new: true, runValidators: true }
-    ).select('-password -__v -refreshToken');
+    // Find and update the user with detailed error handling
+    let updatedUser;
+    try {
+      updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { $set: updatesToApply },
+        { 
+          new: true, 
+          runValidators: true,
+          context: 'query' // Ensures validators run with the correct context
+        }
+      ).select('-password -__v -refreshToken -resetPasswordToken -resetPasswordExpire');
 
-    if (!updatedUser) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found or update failed' 
+      if (!updatedUser) {
+        console.error('User not found during update:', userId);
+        return res.status(404).json({ 
+          success: false, 
+          message: 'User not found or update failed',
+          code: 'USER_UPDATE_FAILED'
+        });
+      }
+      
+      console.log('User profile updated successfully:', {
+        userId: updatedUser._id,
+        updatedFields: Object.keys(updatesToApply),
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (updateError) {
+      console.error('Error updating user in database:', {
+        error: updateError.message,
+        name: updateError.name,
+        code: updateError.code,
+        stack: updateError.stack,
+        updates: updatesToApply,
+        userId: userId
+      });
+      
+      // Handle duplicate key errors (e.g., duplicate email)
+      if (updateError.code === 11000) {
+        const field = Object.keys(updateError.keyPattern)[0];
+        const message = `The ${field} is already in use. Please choose a different one.`;
+        
+        return res.status(409).json({
+          success: false,
+          message: message,
+          field: field,
+          code: 'DUPLICATE_KEY',
+          duplicateField: field
+        });
+      }
+      
+      // Handle validation errors
+      if (updateError.name === 'ValidationError') {
+        const errors = Object.values(updateError.errors).map(err => ({
+          field: err.path,
+          message: err.message,
+          type: err.kind
+        }));
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          code: 'VALIDATION_ERROR',
+          errors: errors
+        });
+      }
+      
+      // For any other database errors
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update user profile due to a database error',
+        code: 'DATABASE_ERROR',
+        error: process.env.NODE_ENV === 'development' ? updateError.message : undefined
       });
     }
-
-    console.log('User profile updated successfully:', updatedUser);
     
-    // Prepare response
+    // Prepare the success response
     const response = {
       success: true,
       message: 'Profile updated successfully',
-      user: updatedUser.toObject()
+      user: {
+        _id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        phoneNumber: updatedUser.phoneNumber,
+        bio: updatedUser.bio,
+        profilePicture: updatedUser.profilePicture,
+        role: updatedUser.role,
+        isEmailVerified: updatedUser.isEmailVerified,
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt
+      },
+      updatedAt: updatedUser.updatedAt,
+      timestamp: new Date().toISOString()
     };
     
-    // If profile picture was updated, include the new URL
+    // If profile picture was updated, include additional info
     if (updatesToApply.profilePicture !== undefined) {
-      response.profilePicture = updatedUser.profilePicture;
+      response.profileUpdate = {
+        pictureUpdated: true,
+        newUrl: updatedUser.profilePicture
+      };
     }
     
-    res.json(response);
+    // Send the success response
+    res.status(200).json(response);
   } catch (error) {
     console.error('Error updating user profile:', {
       error: error.message,
