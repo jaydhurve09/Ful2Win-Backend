@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Wallet from '../models/Wallet.js'; 
 import User from '../models/User.js';
 import { createOrder, verifyPayment } from '../utils/razorpay.js';
@@ -6,7 +7,7 @@ import { processReferralRewards } from './referralController.js';
 // @desc    Create Razorpay order
 // @route   POST /api/wallet/create-order
 // @access  Private
-export const createRazorpayOrder = async (req, res) => {
+const createRazorpayOrder = async (req, res) => {
   try {
     const { amount } = req.body;
     //const userId = req.user._id;
@@ -43,7 +44,7 @@ export const createRazorpayOrder = async (req, res) => {
 // @desc    Verify payment and update wallet
 // @route   POST /api/wallet/verify-payment
 // @access  Private
-export const verifyAndUpdateWallet = async (req, res) => {
+const verifyAndUpdateWallet = async (req, res) => {
   try {
     const { 
       razorpay_order_id, 
@@ -145,7 +146,7 @@ export const verifyAndUpdateWallet = async (req, res) => {
 // @desc    Get wallet balance
 // @route   GET /api/wallet/balance
 // @access  Private
-export const getWalletBalance = async (req, res) => {
+const getWalletBalance = async (req, res) => {
   try {
     const wallet = await Wallet.findOne({ user: req.user._id });
     

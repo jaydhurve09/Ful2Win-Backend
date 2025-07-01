@@ -8,8 +8,7 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
-
-export const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
+ const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
   const options = {
     amount: amount * 100, // Razorpay expects amount in paise
     currency,
@@ -26,7 +25,7 @@ export const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1
   }
 };
 
-export const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
+ const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
   const text = `${razorpayOrderId}|${razorpayPaymentId}`;
   const generatedSignature = crypto
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
