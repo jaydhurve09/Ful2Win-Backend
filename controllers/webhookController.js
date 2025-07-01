@@ -1,10 +1,12 @@
-const Wallet = require('../models/Wallet');
-const { verifyPayment } = require('../utils/razorpay');
+import Wallet from '../models/Wallet.js';
+import { verifyPayment } from '../utils/razorpay.js';
+import mongoose from 'mongoose';
+import crypto from 'crypto';
 
 // @desc    Handle Razorpay webhook events
 // @route   POST /api/webhooks/razorpay
 // @access  Public (Razorpay will call this)
-exports.handleWebhook = async (req, res) => {
+export const handleWebhook = async (req, res) => {
   // Get the signature from the headers
   const razorpaySignature = req.headers['x-razorpay-signature'];
   
@@ -14,7 +16,6 @@ exports.handleWebhook = async (req, res) => {
   
   try {
     // Verify the webhook signature
-    const crypto = require('crypto');
     const expectedSignature = crypto
       .createHmac('sha256', '') // Webhook secret removed
       .update(rawBody)

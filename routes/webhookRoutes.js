@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import { handleWebhook } from '../controllers/webhookController.js';
+
 const router = express.Router();
-const webhookController = require('../controllers/webhookController');
 
 // Middleware to get raw body for signature verification
 const rawBodySaver = (req, res, buf, encoding) => {
@@ -20,7 +21,7 @@ router.post(
     type: 'application/json',
     verify: rawBodySaver
   }),
-  webhookController.handleWebhook
+  handleWebhook
 );
 
-module.exports = router;
+export default router;

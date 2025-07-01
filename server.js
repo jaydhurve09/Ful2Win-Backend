@@ -7,15 +7,17 @@ import fileUpload from 'express-fileupload';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
+import { isConfigured } from './config/cloudinary.js';
 import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
+import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
-
 import walletRoutes from './routes/walletRoutes.js';
-//import webhookRoutes from './routes/webhookRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
+// import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import Gamerouter from './routes/gameRoute.js';
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
@@ -32,20 +34,54 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Load environment variables
-dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env.production' : '.env' });
+const envPath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
+console.log(`[Server] Loading environment from: ${envPath}`);
+console.log(`[Server] Current working directory: ${process.cwd()}`);
 
-// Verify required environment variables
-const requiredEnvVars = [
-  'RAZORPAY_KEY_ID',
-  'RAZORPAY_KEY_SECRET',
+// Load environment variables
+try {
+  const result = dotenv.config({ path: envPath });
+  if (result.error) {
+    console.error('[Server] Error loading .env file:', result.error);
+    process.exit(1);
+  }
+  
+  console.log(`[Server] Successfully loaded environment from ${envPath}`);
+  console.log('[Server] Successfully loaded .env file');
 
-];
+  // Verify required environment variables
+  const requiredEnvVars = [
+    'RAZORPAY_KEY_ID',
+    'RAZORPAY_KEY_SECRET',
+    'MONGODB_URI',
+    'JWT_SECRET',
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET'
+  ];
 
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-if (missingVars.length > 0) {
-  console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  if (missingVars.length > 0) {
+    console.error(`[Server] Missing required environment variables: ${missingVars.join(', ')}`);
+    process.exit(1);
+  }
+
+  // Log the Cloudinary config (masking sensitive values)
+  if (process.env.CLOUDINARY_CLOUD_NAME) {
+    console.log('[Server] Cloudinary Config:', {
+      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'Not set',
+      CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'Not set'
+    });
+  } else {
+    console.warn('[Server] Cloudinary environment variables not found in .env file');
+  }
+} catch (error) {
+  console.error('[Server] Error loading environment variables:', error);
   process.exit(1);
 }
+
+// Services will be initialized in startServer()
 
 // Trust proxy for production
 app.set('trust proxy', 1);
@@ -65,8 +101,8 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Add FRONTEND_URL if it exists
-if (process.env.FRONTEND_URL) {
-  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
+if (process.env.FRONTEND_URL || process.env.LOCAL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '') || process.env.LOCAL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
   }
@@ -117,15 +153,18 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3398a50f2148f349c44930d0de4241f257500aca
 // Parse JSON for all routes except webhooks (webhooks need raw body for signature verification)
-app.use((req, res, next) => {
-  if (req.originalUrl.startsWith('/api/webhooks')) {
-    next();
-  } else {
-    express.json({ limit: '50mb' })(req, res, next);
-  }
-});
+// app.use((req, res, next) => {
+//   if (req.originalUrl.startsWith('/api/webhooks')) {
+//     next();
+//   } else {
+//     express.json({ limit: '50mb' })(req, res, next);
+//   }
+// });
 
 // Apply CORS to all routes except webhooks
 app.use((req, res, next) => {
@@ -146,8 +185,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Log CORS configuration
-console.log('CORS Allowed Origins:', allowedOrigins);
 
 // Apply CORS to all routes
 app.options('*', cors(corsOptions)); // Enable preflight for all routes
@@ -228,6 +265,7 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+<<<<<<< HEAD
 
 
 // API Routes
@@ -240,6 +278,21 @@ app.use('/api/referrals', referralRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 
+=======
+
+// API Routes
+
+app.use('/api/users', userRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
+app.use('/api/score', Gamerouter); // Add the new game route
+// Webhook routes (no body parsing for webhook verification)
+// app.use('/api/webhooks', webhookRoutes);
+app.use('/api/auth', authRoutes);
+//app.use('/api/wallet', walletRoute); // Add wallet routes
+>>>>>>> 3398a50f2148f349c44930d0de4241f257500aca
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
@@ -407,23 +460,32 @@ app.use((err, req, res, next) => {
 // Start the server
 const startServer = async () => {
   try {
-    console.log('Initializing database connection...');
+    // Initialize database
+    console.log('Connecting to MongoDB...');
     await connectDB();
-    console.log('Database connection established');
     
+    // Initialize Cloudinary (non-blocking)
     console.log('Initializing Cloudinary...');
-    await connectCloudinary();
+    try {
+      await connectCloudinary();
+      console.log('✅ Cloudinary connected successfully');
+    } catch (error) {
+      console.warn('⚠️ Cloudinary initialization warning:', error.message);
+      console.log('⚠️ Server will start without Cloudinary. Some features may not work.');
+    }
     
     // Start the server
     const port = process.env.PORT || 10000;
     const server = app.listen(port, () => {
-      console.log(`Server running on port ${port} in ${process.env.NODE_ENV} mode`);
-      console.log(`API URL: http://localhost:${port}`);
+      console.log(`\n🚀 Server running on port ${port} (${process.env.NODE_ENV || 'development'} mode)`);
+      console.log(`🌐 API: http://localhost:${port}/api`);
+      console.log(`📝 API Documentation: http://localhost:${port}/api-docs`);
+      console.log('\nPress CTRL+C to stop the server\n');
     });
     
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (err) => {
-      console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+      console.error('\n❌ UNHANDLED REJECTION! Shutting down...');
       console.error(err.name, err.message);
       server.close(() => {
         process.exit(1);
@@ -432,7 +494,7 @@ const startServer = async () => {
     
     // Handle SIGTERM for graceful shutdown
     process.on('SIGTERM', () => {
-      console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+      console.log('\n👋 SIGTERM RECEIVED. Shutting down gracefully');
       server.close(() => {
         console.log('💥 Process terminated!');
         process.exit(0);
@@ -463,6 +525,9 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+// Export the app
+export { app };
 
 // Start the server
 startServer();

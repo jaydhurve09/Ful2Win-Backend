@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, admin, ownerOrAdmin } from '../middleware/authMiddleware.js';
-import { upload as uploadPostMedia, handleMulterError } from '../middleware/uploadMiddleware.js';
+import { upload, handleMulterError } from '../middleware/uploadMiddleware.js';
 import Post from '../models/Post.js';
 
 const router = express.Router();
@@ -13,8 +13,8 @@ router.post(
   '/',
   protect,
   (req, res, next) => {
-    // Use the upload middleware (handles both with and without files)
-    uploadPostMedia.single('media')(req, res, (err) => {
+    // Use the upload middleware with memory storage for Cloudinary
+    upload.single('media')(req, res, (err) => {
       if (err) {
         return handleMulterError(err, req, res, next);
       }
@@ -35,29 +35,8 @@ router.put(
   '/:id',
   protect,
   (req, res, next) => {
-    // First verify the post exists and user is the author or admin
-    Post.findById(req.params.id)
-      .then(post => {
-        if (!post) {
-          return res.status(404).json({ message: 'Post not found' });
-        }
-        
-        // Check if user is the author or admin
-        if (post.author.toString() !== req.user.id && !req.user.isAdmin) {
-          return res.status(403).json({ 
-            message: 'Not authorized to update this post' 
-          });
-        }
-        
-        // Add the post to the request object for use in the controller
-        req.post = post;
-        next();
-      })
-      .catch(next);
-  },
-  (req, res, next) => {
-    // Use the upload middleware
-    uploadPostMedia(req, res, (err) => {
+    // Use the upload middleware with memory storage for Cloudinary
+    upload.single('media')(req, res, (err) => {
       if (err) {
         return handleMulterError(err, req, res, next);
       }
@@ -69,34 +48,13 @@ router.put(
 
 // Delete a post
 router.delete(
-  '/:id', 
+  '/:id',
   protect,
-  (req, res, next) => {
-    // First verify the post exists and user is the author or admin
-    Post.findById(req.params.id)
-      .then(post => {
-        if (!post) {
-          return res.status(404).json({ message: 'Post not found' });
-        }
-        
-        // Check if user is the author or admin
-        if (post.author.toString() !== req.user.id && !req.user.isAdmin) {
-          return res.status(403).json({ 
-            message: 'Not authorized to delete this post' 
-          });
-        }
-        
-        // Add the post to the request object for use in the controller
-        req.post = post;
-        next();
-      })
-      .catch(next);
-  },
   postController.deletePost
 );
 
-// Like/Unlike a post
-router.post('/:id/like', protect, postController.likePost);
+// Like/Unlike a post (expects { postId, userId } in request body)
+router.post('/like', protect, postController.likePost);
 
 // Save/Unsave a post
 router.post('/:id/save', protect, postController.toggleSavePost);

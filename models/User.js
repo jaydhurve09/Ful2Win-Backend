@@ -198,6 +198,243 @@ const userSchema = new mongoose.Schema({
       sms: { type: Boolean, default: false }
     }
   },
+  // Game Statistics
+  gameStats: {
+    totalMatches: { type: Number, default: 0 },
+    totalWins: { type: Number, default: 0 },
+    totalLosses: { type: Number, default: 0 },
+    winRate: { type: Number, default: 0 }, // Percentage
+    totalTournaments: { type: Number, default: 0 },
+    tournamentWins: { type: Number, default: 0 },
+    totalEarnings: { type: Number, default: 0 }, // In coins
+    totalSpent: { type: Number, default: 0 }, // In coins
+    rank: { type: Number, default: 0 },
+    experience: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
+    // Per-game statistics
+    games: [{
+      gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+      name: String,
+      matchesPlayed: { type: Number, default: 0 },
+      matchesWon: { type: Number, default: 0 },
+      winRate: { type: Number, default: 0 },
+      highestScore: { type: Number, default: 0 },
+      averageScore: { type: Number, default: 0 },
+      totalScore: { type: Number, default: 0 },
+      tournamentsPlayed: { type: Number, default: 0 },
+      tournamentsWon: { type: Number, default: 0 },
+      lastPlayed: Date
+    }]
+  },
+  
+  // Tournament participation
+  tournaments: [{
+    tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament' },
+    name: String,
+    gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+    gameName: String,
+    status: {
+      type: String,
+      enum: ['registered', 'playing', 'eliminated', 'completed', 'winner', 'runner_up']
+    },
+    position: Number,
+    entryFee: Number,
+    prizeWon: Number,
+    startDate: Date,
+    endDate: Date,
+    matches: [{
+      matchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
+      roundNumber: Number,
+      status: String,
+      result: { type: String, enum: ['won', 'lost', 'draw', 'pending'] },
+      score: Number,
+      opponent: {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        username: String,
+        score: Number
+      },
+      playedAt: Date
+    }]
+  }],
+  
+  // Match history
+  matchHistory: [{
+    matchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
+    gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+    gameName: String,
+    gameMode: { type: String, enum: ['classic', 'tournament', 'quick', 'private'] },
+    tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament' },
+    tournamentName: String,
+    result: { type: String, enum: ['won', 'lost', 'draw', 'abandoned'] },
+    score: Number,
+    position: Number, // For games with rankings
+    players: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      username: String,
+      score: Number,
+      isWinner: Boolean
+    }],
+    startTime: Date,
+    endTime: Date,
+    duration: Number, // in seconds
+    entryFee: Number,
+    earnings: Number,
+    roomId: String
+  }],
+  
+  // Achievements and badges
+  achievements: [{
+    id: String,
+    name: String,
+    description: String,
+    icon: String,
+    earnedAt: Date,
+    progress: { current: Number, target: Number },
+    isUnlocked: Boolean
+  }],
+  
+  // Friends and social
+  friends: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    username: String,
+    status: { type: String, enum: ['pending', 'accepted', 'blocked'] },
+    since: { type: Date, default: Date.now },
+    stats: {
+      matchesPlayed: { type: Number, default: 0 },
+      matchesWon: { type: Number, default: 0 },
+      winRate: { type: Number, default: 0 }
+    }
+  }],
+  
+  // Chat and Messaging
+  chats: [{
+    chatId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat' },
+    participants: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      username: String,
+      avatar: String
+    }],
+    lastMessage: {
+      content: String,
+      timestamp: Date,
+      isRead: { type: Boolean, default: false }
+    },
+    unreadCount: { type: Number, default: 0 },
+    isMuted: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false },
+    lastOpened: { type: Date, default: Date.now }
+  }],
+  
+  // Post and Content
+  posts: [{
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
+    title: String,
+    content: String,
+    media: [String],
+    likes: { type: Number, default: 0 },
+    comments: { type: Number, default: 0 },
+    shares: { type: Number, default: 0 },
+    isPublic: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  }],
+  
+  // Game Library
+  gameLibrary: [{
+    gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+    name: String,
+    category: String,
+    thumbnail: String,
+    lastPlayed: Date,
+    playCount: { type: Number, default: 0 },
+    isFavorite: { type: Boolean, default: false },
+    achievements: [{
+      id: String,
+      name: String,
+      description: String,
+      icon: String,
+      unlockedAt: Date,
+      progress: { current: Number, target: Number },
+      isUnlocked: Boolean
+    }],
+    stats: {
+      highScore: Number,
+      totalScore: { type: Number, default: 0 },
+      totalTimePlayed: { type: Number, default: 0 }, // in minutes
+      wins: { type: Number, default: 0 },
+      losses: { type: Number, default: 0 },
+      draws: { type: Number, default: 0 },
+      winStreak: { type: Number, default: 0 },
+      bestWinStreak: { type: Number, default: 0 }
+    },
+    customSettings: mongoose.Schema.Types.Mixed
+  }],
+  
+  // User Content
+  likedPosts: [{
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
+    likedAt: { type: Date, default: Date.now }
+  }],
+  
+  savedPosts: [{
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
+    savedAt: { type: Date, default: Date.now },
+    folder: { type: String, default: 'default' }
+  }],
+  
+  // Game Preferences
+  gamePreferences: {
+    defaultGameSettings: mongoose.Schema.Types.Mixed,
+    preferredGames: [{
+      gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+      name: String,
+      category: String,
+      lastPlayed: Date,
+      playCount: Number
+    }],
+    recentlyPlayed: [{
+      gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+      name: String,
+      lastPlayed: Date,
+      duration: Number // in minutes
+    }],
+    controls: {
+      sensitivity: { type: Number, default: 5, min: 1, max: 10 },
+      keybindings: mongoose.Schema.Types.Mixed,
+      controllerLayout: { type: String, default: 'default' }
+    },
+    privacy: {
+      showOnlineStatus: { type: Boolean, default: true },
+      allowGameInvites: { type: String, enum: ['everyone', 'friends', 'none'], default: 'friends' },
+      showGameActivity: { type: Boolean, default: true },
+      showAchievements: { type: Boolean, default: true }
+    }
+  },
+  
+  // User preferences for notifications
+  notificationPreferences: {
+    email: {
+      gameInvites: { type: Boolean, default: true },
+      tournamentUpdates: { type: Boolean, default: true },
+      matchResults: { type: Boolean, default: true },
+      friendRequests: { type: Boolean, default: true },
+      achievements: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: false }
+    },
+    push: {
+      gameInvites: { type: Boolean, default: true },
+      yourTurn: { type: Boolean, default: true },
+      matchResults: { type: Boolean, default: true },
+      friendRequests: { type: Boolean, default: true }
+    },
+    inApp: {
+      all: { type: Boolean, default: true },
+      friendOnline: { type: Boolean, default: true },
+      tournamentReminders: { type: Boolean, default: true }
+    }
+  },
+  
+  // User stats (kept for backward compatibility)
   stats: {
     postCount: { type: Number, default: 0 },
     followerCount: { type: Number, default: 0 },
@@ -248,15 +485,7 @@ userSchema.post('save', function(doc) {
   });
 });
 
-// Add post-init hook to log when documents are loaded
-userSchema.post('init', function(doc) {
-  console.log('=== User Post-Init Hook ===');
-  console.log('Document loaded from database:', {
-    _id: doc._id,
-    fullName: doc.fullName,
-    phoneNumber: doc.phoneNumber
-  });
-});
+// Post-init hook removed for cleaner logs
 
 // Method to compare password
 userSchema.methods.matchPassword = async function (enteredPassword) {

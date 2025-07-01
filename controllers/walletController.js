@@ -6,7 +6,7 @@ import { processReferralRewards } from './referralController.js';
 // @desc    Create Razorpay order
 // @route   POST /api/wallet/create-order
 // @access  Private
-const createRazorpayOrder = async (req, res) => {
+export const createRazorpayOrder = async (req, res) => {
   try {
     const { amount } = req.body;
     //const userId = req.user._id;
@@ -43,7 +43,7 @@ const createRazorpayOrder = async (req, res) => {
 // @desc    Verify payment and update wallet
 // @route   POST /api/wallet/verify-payment
 // @access  Private
-const verifyAndUpdateWallet = async (req, res) => {
+export const verifyAndUpdateWallet = async (req, res) => {
   try {
     const { 
       razorpay_order_id, 
@@ -145,7 +145,7 @@ const verifyAndUpdateWallet = async (req, res) => {
 // @desc    Get wallet balance
 // @route   GET /api/wallet/balance
 // @access  Private
-const getWalletBalance = async (req, res) => {
+export const getWalletBalance = async (req, res) => {
   try {
     const wallet = await Wallet.findOne({ user: req.user._id });
     

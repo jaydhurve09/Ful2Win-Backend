@@ -1,12 +1,15 @@
 import express from 'express';
-import {createRazorpayOrder, verifyAndUpdateWallet, getWalletBalance } from '../controllers/walletController.js';
+import { protect } from '../middleware/authMiddleware.js';
+import { 
+  createRazorpayOrder, 
+  verifyAndUpdateWallet, 
+  getWalletBalance 
+} from '../controllers/walletController.js';
 
 const router = express.Router();
-//const { protect } = require('../middleware/authMiddleware');
-
 
 // Protected routes (require authentication)
-//router.use(protect);
+// router.use(protect);
 
 // Create Razorpay order
 router.post('/create-order', createRazorpayOrder);

@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import Post from '../models/Post.js';
 import User from '../models/User.js';
+import { uploadToCloudinary } from '../config/cloudinary.js';
 
 /**
  * @desc    Create a new post
@@ -28,22 +29,41 @@ const createPost = async (req, res) => {
     // Handle file upload if present
     if (req.file) {
       try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          folder: "posts",
-          use_filename: true,
-          unique_filename: false,
-        });
+        // Convert buffer to data URI for Cloudinary
+        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         
-        // Add image to post data
-        postData.images = [{
-          url: result.secure_url,
-          publicId: result.public_id,
-          width: result.width,
-          height: result.height
-        }];
+        // Upload to Cloudinary using the configured function
+        const result = await uploadToCloudinary(dataUri, 'posts');
+        
+        // Add media to post data based on resource type
+        if (result && result.secure_url) {
+          postData.media = {
+            url: result.secure_url,
+            publicId: result.public_id,
+            resourceType: result.resource_type || 'image',
+            format: result.format,
+            width: result.width,
+            height: result.height,
+            duration: result.duration
+          };
+          
+          // For backward compatibility, also set the images array
+          if (result.resource_type === 'image') {
+            postData.images = [{
+              url: result.secure_url,
+              publicId: result.public_id,
+              width: result.width,
+              height: result.height
+            }];
+          }
+        }
       } catch (uploadError) {
-        console.error('Error uploading media:', uploadError);
-        return res.status(500).json({ message: 'Error uploading media' });
+        console.error('Error uploading media to Cloudinary:', uploadError);
+        return res.status(500).json({ 
+          success: false,
+          message: 'Error uploading media',
+          error: uploadError.message 
+        });
       }
     }
 
@@ -83,63 +103,137 @@ const createPost = async (req, res) => {
 
 /**
  * @desc    Update a post
- * @route   POST /api/posts/update
+ * @route   PUT /api/posts/:id
  * @access  Private
  */
 const updatePost = async (req, res) => {
   try {
-    const { postId, title, content, image, likes, comments } = req.body;
+    const { id } = req.params;
+    const { title, content, tags } = req.body;
+    const userId = req.user.id;
 
     // Find the post by ID
-    const post = await Post.findById(postId);
+    const post = await Post.findById(id);
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({ success: false, message: 'Post not found' });
     }
 
-    // Update the post fields
-    post.title = title || post.title;
-    post.content = content || post.content;
-    post.likes = likes || post.likes;
-    post.comments = comments || post.comments;
-    if (image) {
-      // If a new image is provided, upload it to Cloudinary
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "posts",
-        use_filename: true,
-        unique_filename: false,
+    // Verify post ownership
+    if (post.author.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to update this post' 
       });
-      post.image = result.secure_url; // Update the image URL
     }
 
-    // Save the updated post
+    // Update post fields if provided
+    if (title) post.title = title;
+    if (content) post.content = content;
+    if (tags) post.tags = tags.split(',').map(tag => tag.trim());
+    
+    // Handle file upload if present
+    if (req.file) {
+      try {
+        // Delete old media if exists
+        if (post.media?.publicId) {
+          await cloudinary.uploader.destroy(post.media.publicId);
+        }
+
+        // Upload new media
+        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const result = await uploadToCloudinary(dataUri, 'posts');
+        
+        if (result && result.secure_url) {
+          post.media = {
+            url: result.secure_url,
+            publicId: result.public_id,
+            resourceType: result.resource_type || 'image',
+            format: result.format,
+            width: result.width,
+            height: result.height,
+            duration: result.duration
+          };
+        }
+      } catch (uploadError) {
+        console.error('Error updating post media:', uploadError);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Error updating post media' 
+        });
+      }
+    }
+
+    post.updatedAt = Date.now();
     const updatedPost = await post.save();
+
     res.status(200).json({
-      message: "Post updated successfully",
-      post: updatedPost,
+      success: true,
+      message: 'Post updated successfully',
+      post: updatedPost
     });
   } catch (error) {
-    console.error("Error updating post:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error('Error updating post:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error',
+      error: error.message 
+    });
   }
 }
 
 /**
  * @desc    Delete a post
- * @route   POST /api/posts/remove
+ * @route   DELETE /api/posts/:id
  * @access  Private
  */
 const deletePost = async (req, res) => {
   try {
-    const { postId } = req.body;
-    // Find the post by ID and delete it
-    const deletedPost = await Post.findByIdAndDelete(postId);
-    if (!deletedPost) {
-      return res.status(404).json({ message: "Post not found" });
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Find the post by ID
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Post not found' 
+      });
     }
-    res.status(200).json({ message: "Post deleted successfully" });
+
+    // Verify post ownership
+    if (post.author.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to delete this post' 
+      });
+    }
+
+    // Delete media from Cloudinary if exists
+    if (post.media?.publicId) {
+      try {
+        await cloudinary.uploader.destroy(post.media.publicId, {
+          resource_type: post.media.resourceType || 'image'
+        });
+      } catch (cloudinaryError) {
+        console.error('Error deleting media from Cloudinary:', cloudinaryError);
+        // Continue with post deletion even if media deletion fails
+      }
+    }
+
+    // Delete the post
+    await Post.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Post deleted successfully'
+    });
   } catch (error) {
-    console.error("Error deleting post:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error('Error deleting post:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error',
+      error: error.message 
+    });
   }
 }
 
