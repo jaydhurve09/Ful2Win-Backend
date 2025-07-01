@@ -506,8 +506,8 @@ const startServer = async () => {
   }
 };
 
-// Export the app
-export { app };
+// Export the app and startServer function
+export { app, startServer };
 
-// Start the server
-startServer();
+// For backward compatibility
+export default { app, startServer };

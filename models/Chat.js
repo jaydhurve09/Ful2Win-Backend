@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import $1 from '$2';
 
 const messageSchema = new mongoose.Schema({
   sender: {
