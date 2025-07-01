@@ -33,6 +33,29 @@ const generateUsername = async (fullName) => {
   return username;
 };
 
+// Function to generate a random referral code
+const generateReferralCode = async () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding similar looking characters
+  let code = '';
+  let isUnique = false;
+  
+  while (!isUnique) {
+    // Generate a random 8-character code
+    code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if code is already in use
+    const existingUser = await mongoose.model('User').findOne({ referralCode: code });
+    if (!existingUser) {
+      isUnique = true;
+    }
+  }
+  
+  return code;
+};
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -50,11 +73,27 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
+    required: true,
     unique: true,
-    sparse: true,
     trim: true,
     lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address.']
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
+  },
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    uppercase: true,
+    match: [/^[A-Z0-9]{6,10}$/, 'Referral code must be 6-10 alphanumeric characters']
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  hasMadeFirstDeposit: {
+    type: Boolean,
+    default: false
   },
   phoneNumber: {
     type: String,
@@ -452,6 +491,14 @@ userSchema.post('save', function(doc) {
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Generate referral code for new users
+userSchema.pre('save', async function(next) {
+  if (this.isNew && !this.referralCode) {
+    this.referralCode = await generateReferralCode();
+  }
+  next();
+});
 
 // Generate JWT token
 userSchema.methods.getSignedJwtToken = function () {

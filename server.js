@@ -12,7 +12,8 @@ import postRoutes from './routes/postRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
- //import walletRoute from './routes/walletRoutes.js';
+import walletRoutes from './routes/walletRoutes.js';
+import referralRoutes from './routes/referralRoutes.js';
 // import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -37,39 +38,48 @@ const envPath = process.env.NODE_ENV === 'production' ? '.env.production' : '.en
 console.log(`[Server] Loading environment from: ${envPath}`);
 console.log(`[Server] Current working directory: ${process.cwd()}`);
 
+// Load environment variables
 try {
   const result = dotenv.config({ path: envPath });
   if (result.error) {
     console.error('[Server] Error loading .env file:', result.error);
+    process.exit(1);
+  }
+  
+  console.log(`[Server] Successfully loaded environment from ${envPath}`);
+  console.log('[Server] Successfully loaded .env file');
+
+  // Verify required environment variables
+  const requiredEnvVars = [
+    'RAZORPAY_KEY_ID',
+    'RAZORPAY_KEY_SECRET',
+    'MONGODB_URI',
+    'JWT_SECRET',
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET'
+  ];
+
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  if (missingVars.length > 0) {
+    console.error(`[Server] Missing required environment variables: ${missingVars.join(', ')}`);
+    process.exit(1);
+  }
+
+  // Log the Cloudinary config (masking sensitive values)
+  if (process.env.CLOUDINARY_CLOUD_NAME) {
+    console.log('[Server] Cloudinary Config:', {
+      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'Not set',
+      CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'Not set'
+    });
   } else {
-    console.log('[Server] Successfully loaded .env file');
-    // Log the Cloudinary config (masking sensitive values)
-    if (process.env.CLOUDINARY_NAME) {
-      console.log('[Server] Cloudinary Config:', {
-        CLOUDINARY_NAME: process.env.CLOUDINARY_NAME,
-        CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'Not set',
-        CLOUDINARY_SECRET_KEY: process.env.CLOUDINARY_SECRET_KEY ? '***' + process.env.CLOUDINARY_SECRET_KEY.slice(-4) : 'Not set'
-      });
-    } else {
-      console.warn('[Server] Cloudinary environment variables not found in .env file');
-    }
+    console.warn('[Server] Cloudinary environment variables not found in .env file');
   }
 } catch (error) {
   console.error('[Server] Error loading environment variables:', error);
+  process.exit(1);
 }
-
-// Verify required environment variables
-// const requiredEnvVars = [
-//   'RAZORPAY_KEY_ID',
-//   'RAZORPAY_KEY_SECRET',
-//   'RAZORPAY_WEBHOOK_SECRET'
-// ];
-
-// const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-// if (missingVars.length > 0) {
-//   console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
-//   process.exit(1);
-// }
 
 // Services will be initialized in startServer()
 
@@ -253,17 +263,16 @@ app.use((err, req, res, next) => {
 });
 
 // API Routes
-
 app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/car-racing', carRacingRoute);
 app.use('/api/score', Gamerouter); // Add the new game route
-// Webhook routes (no body parsing for webhook verification)
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
 // app.use('/api/webhooks', webhookRoutes);
-app.use('/api/auth', authRoutes);
-//app.use('/api/wallet', walletRoute); // Add wallet routes
 
 // Game routes
 app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
@@ -497,8 +506,8 @@ const startServer = async () => {
   }
 };
 
-// Export the app
-export { app };
+// Export the app and startServer function
+export { app, startServer };
 
-// Start the server
-startServer();
+// For backward compatibility
+export default { app, startServer };

@@ -17,7 +17,7 @@ export const handleWebhook = async (req, res) => {
   try {
     // Verify the webhook signature
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
+      .createHmac('sha256', '') // Webhook secret removed
       .update(rawBody)
       .digest('hex');
 

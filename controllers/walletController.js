@@ -1,18 +1,22 @@
-import Wallet from '../models/Wallet.js';
+import mongoose from 'mongoose';
+import Wallet from '../models/Wallet.js'; 
+import User from '../models/User.js';
 import { createOrder, verifyPayment } from '../utils/razorpay.js';
+import { processReferralRewards } from './referralController.js';
 
 // @desc    Create Razorpay order
 // @route   POST /api/wallet/create-order
 // @access  Private
-export const createRazorpayOrder = async (req, res) => {
+const createRazorpayOrder = async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user._id;
+    //const userId = req.user._id;
+    const userId = "1234khuyg";
 
     if (!amount || isNaN(amount) || amount < 1) {
       return res.status(400).json({ 
         success: false,
-        error: 'Please provide a valid amount (minimum ₹1)' 
+        error: 'Please provide a valid amount (minimum ₹10)' 
       });
     }
 
@@ -40,7 +44,7 @@ export const createRazorpayOrder = async (req, res) => {
 // @desc    Verify payment and update wallet
 // @route   POST /api/wallet/verify-payment
 // @access  Private
-export const verifyAndUpdateWallet = async (req, res) => {
+const verifyAndUpdateWallet = async (req, res) => {
   try {
     const { 
       razorpay_order_id, 
@@ -88,16 +92,31 @@ export const verifyAndUpdateWallet = async (req, res) => {
       // Update wallet balance
       wallet.balance += parseFloat(amount);
       
-      // Add transaction record
+      // Check if this is user's first deposit
+      const user = await User.findById(userId);
+      const isFirstDeposit = !user.hasMadeFirstDeposit;
+      
+      // Update wallet balance
+      wallet.balance += amount;
       wallet.transactions.push({
-        amount: parseFloat(amount),
+        amount,
         type: 'credit',
-        description: 'Wallet top-up via Razorpay',
-        reference: razorpay_payment_id,
+        description: 'Deposit via Razorpay',
+        reference: `RZP_${razorpay_payment_id}`,
         status: 'completed'
       });
-
-      await wallet.save({ session });
+      
+      await wallet.save();
+      
+      // Process referral rewards if this is the first deposit
+      if (isFirstDeposit) {
+        try {
+          await processReferralRewards(userId);
+        } catch (error) {
+          console.error('Error processing referral rewards:', error);
+          // Don't fail the transaction if referral processing fails
+        }
+      }
       await session.commitTransaction();
       session.endSession();
 
@@ -127,7 +146,7 @@ export const verifyAndUpdateWallet = async (req, res) => {
 // @desc    Get wallet balance
 // @route   GET /api/wallet/balance
 // @access  Private
-export const getWalletBalance = async (req, res) => {
+const getWalletBalance = async (req, res) => {
   try {
     const wallet = await Wallet.findOne({ user: req.user._id });
     
@@ -143,4 +162,10 @@ export const getWalletBalance = async (req, res) => {
       error: 'Error fetching wallet balance'
     });
   }
+};
+
+export {
+  createRazorpayOrder,
+  verifyAndUpdateWallet,
+  getWalletBalance
 };
