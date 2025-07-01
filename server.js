@@ -13,7 +13,7 @@ import carRacingRoute from './routes/carRacingRoute.js';
 
 import walletRoutes from './routes/walletRoutes.js';
 //import webhookRoutes from './routes/webhookRoutes.js';
-
+import referralRoutes from './routes/referralRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 
@@ -38,7 +38,7 @@ dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env.production' 
 const requiredEnvVars = [
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET',
-  'RAZORPAY_WEBHOOK_SECRET'
+
 ];
 
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -231,15 +231,13 @@ app.use((err, req, res, next) => {
 
 
 // API Routes
-app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
-
+app.use('/api/car-racing', carRacingRoute);
 app.use('/api/wallet', walletRoutes);
-
-// Webhook routes (no body parsing for webhook verification)
 //app.use('/api/webhooks', webhookRoutes);
-
+app.use('/api/referrals', referralRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 
 

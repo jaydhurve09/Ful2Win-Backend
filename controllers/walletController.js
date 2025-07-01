@@ -1,5 +1,7 @@
 import Wallet from '../models/Wallet.js'; 
+import User from '../models/User.js';
 import { createOrder, verifyPayment } from '../utils/razorpay.js';
+import { processReferralRewards } from './referralController.js';
 
 // @desc    Create Razorpay order
 // @route   POST /api/wallet/create-order
@@ -89,16 +91,31 @@ const verifyAndUpdateWallet = async (req, res) => {
       // Update wallet balance
       wallet.balance += parseFloat(amount);
       
-      // Add transaction record
+      // Check if this is user's first deposit
+      const user = await User.findById(userId);
+      const isFirstDeposit = !user.hasMadeFirstDeposit;
+      
+      // Update wallet balance
+      wallet.balance += amount;
       wallet.transactions.push({
-        amount: parseFloat(amount),
+        amount,
         type: 'credit',
-        description: 'Wallet top-up via Razorpay',
-        reference: razorpay_payment_id,
+        description: 'Deposit via Razorpay',
+        reference: `RZP_${razorpay_payment_id}`,
         status: 'completed'
       });
-
-      await wallet.save({ session });
+      
+      await wallet.save();
+      
+      // Process referral rewards if this is the first deposit
+      if (isFirstDeposit) {
+        try {
+          await processReferralRewards(userId);
+        } catch (error) {
+          console.error('Error processing referral rewards:', error);
+          // Don't fail the transaction if referral processing fails
+        }
+      }
       await session.commitTransaction();
       session.endSession();
 
