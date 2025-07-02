@@ -1,3 +1,4 @@
+require('dotenv').config(); // loads from .env by default
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -22,14 +23,14 @@ import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
-
+require('dotenv').config(); // loads from .env by default
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
   console.error(err.name, err.message);
   process.exit(1);
 });
-
+require('dotenv').config(); // loads from .env by default
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
