@@ -4,8 +4,7 @@ const notificationSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true // For faster lookups by user
+    required: true
   },
   type: {
     type: String,
@@ -26,8 +25,7 @@ const notificationSchema = new mongoose.Schema({
   },
   createdAt: {
     type: Date,
-    default: Date.now,
-    index: true // For sorting by date
+    default: Date.now
   }
 }, {
   timestamps: true
