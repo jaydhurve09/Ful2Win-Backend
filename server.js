@@ -20,6 +20,8 @@ import referralRoutes from './routes/referralRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import followRoutes from './routes/followRoutes.js';
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
@@ -283,6 +285,8 @@ app.use('/api/car-racing', carRacingRoute);
 app.use('/api/score', Gamerouter); // Add the new game route
 app.use('/api/wallet', walletRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/users', followRoutes);
 // app.use('/api/webhooks', webhookRoutes);
 
 // Game routes

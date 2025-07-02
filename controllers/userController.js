@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { v2 as cloudinary } from 'cloudinary';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import Post from '../models/Post.js';
 import path from 'path';
@@ -75,15 +76,15 @@ const __dirname = dirname(__filename);
 // @desc    Register a new user
 // @route   POST /api/users/register
 // @access  Public
-// @desc    Register a new user
-// @route   POST /api/users/register
-// @access  Public
 const registerUser = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     console.log('=== Register User Request ===');
     console.log('Request body:', req.body);
     
-    const { fullName, phoneNumber, password } = req.body;
+    const { fullName, phoneNumber, password, referralCode } = req.body;
 
     if (!fullName || !phoneNumber || !password) {
       console.log('Missing required fields');
@@ -96,7 +97,7 @@ const registerUser = async (req, res) => {
 
     // Check if user already exists
     console.log('Checking if user exists with phone:', phoneNumber);
-    const userExists = await User.findOne({ phoneNumber });
+    const userExists = await User.findOne({ phoneNumber }).session(session);
     if (userExists) {
       console.log('User already exists with phone:', phoneNumber);
       return res.status(400).json({ 
@@ -105,34 +106,68 @@ const registerUser = async (req, res) => {
       });
     }
 
+    // If referral code is provided, validate it
+    let referrer = null;
+    if (referralCode) {
+      referrer = await User.findOne({ referralCode }).session(session);
+      if (!referrer) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid referral code'
+        });
+      }
+    }
+
     console.log('Creating new user...');
     // Create new user
-    const user = await User.create({
+    const userData = {
       fullName,
       phoneNumber,
       password, // Password will be hashed by the pre-save hook in the User model
       Balance: 0,
       followers: [],
       following: []
-    });
+    };
+
+    // If valid referrer, set the referredBy field
+    if (referrer) {
+      userData.referredBy = referrer._id;
+    }
+
+    const user = await User.create([userData], { session });
+    const newUser = user[0];
 
     console.log('User created successfully:', {
-      _id: user._id,
-      fullName: user.fullName,
-      phoneNumber: user.phoneNumber
+      _id: newUser._id,
+      fullName: newUser.fullName,
+      phoneNumber: newUser.phoneNumber,
+      referralCode: newUser.referralCode,
+      referredBy: newUser.referredBy
     });
 
-    // Verify the user was saved to the database
-    const savedUser = await User.findById(user._id);
-    console.log('User retrieved from database:', savedUser ? 'Found' : 'Not found');
+    // Create referral record if applicable
+    if (referrer) {
+      const Referral = (await import('../models/Referral.js')).default;
+      await Referral.create([{
+        referrer: referrer._id,
+        referredUser: newUser._id,
+        referralCode: referrer.referralCode
+      }], { session });
+    }
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
 
     // Return user data (excluding password)
     res.status(201).json({
       success: true,
-      _id: user._id,
-      fullName: user.fullName,
-      phoneNumber: user.phoneNumber,
-      Balance: user.Balance
+      _id: newUser._id,
+      fullName: newUser.fullName,
+      phoneNumber: newUser.phoneNumber,
+      Balance: newUser.Balance,
+      referralCode: newUser.referralCode,
+      referredBy: newUser.referredBy
     });
   } catch (error) {
     console.error('Error registering user:', error);
@@ -150,12 +185,12 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    console.log('\n=== Login Request ===');
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  //  console.log('\n=== Login Request ===');
+  //  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
     
     // Log request headers and body for debugging
-    console.log('Headers:', req.headers);
-    console.log('Raw body:', req.body);
+  //  console.log('Headers:', req.headers);
+  //  console.log('Raw body:', req.body);
     
     let requestBody = req.body;
     
@@ -175,11 +210,11 @@ const loginUser = async (req, res) => {
     const { phoneNumber, password } = requestBody;
     
     // Input validation
-    if (!phoneNumber || !password) {
-      console.log('Missing required fields:', { 
-        phoneNumber: !!phoneNumber, 
-        password: '***' 
-      });
+   if (!phoneNumber || !password) {
+    //  console.log('Missing required fields:', { 
+     //   phoneNumber: !!phoneNumber, 
+       // password: '***' 
+     // });
       
       return res.status(400).json({ 
         success: false,
@@ -201,7 +236,7 @@ const loginUser = async (req, res) => {
     }
 
     // Find user
-    console.log('Looking up user in database with phone number:', phoneNumber);
+   // console.log('Looking up user in database with phone number:', phoneNumber);
     const user = await User.findOne({ phoneNumber }).select('+password');
     
     if (!user) {
@@ -240,6 +275,7 @@ const loginUser = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: 'Login successful',
       token,
       data: user
     });
@@ -335,51 +371,68 @@ const getCurrentUserProfile = async (req, res) => {
   }
 };
 
+// Configure Cloudinary if not already configured
+if (!cloudinary.config().cloud_name) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+  });
+  
+  console.log('Cloudinary configured with cloud name:', process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'missing');
+}
+
 // @desc    Update user profile
 // @route   PUT /api/users/profile/:userId
 // @access  Private
 const updateUserProfile = async (req, res) => {
-  console.log('=== Update Profile Request ===');
-  console.log('Params:', req.params);
-  console.log('Headers:', req.headers);
-  console.log('Request body:', req.body);
+  const session = await mongoose.startSession();
+  session.startTransaction();
   
-  // Log file info if present
-  if (req.file) {
-    console.log('Uploaded file info:', {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer',
-      encoding: req.file.encoding
-    });
-  } else {
-    console.log('No file was uploaded with this request');
-  }
-  
-  // Debug: Log environment info
-  console.log('Environment:', {
-    NODE_ENV: process.env.NODE_ENV,
-    cwd: process.cwd(),
-    __dirname,
-    time: new Date().toISOString()
-  });
-  
-  // Debug: Log Cloudinary config (without exposing secrets)
-  const cloudinaryConfig = {
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'not configured',
-    api_key: process.env.CLOUDINARY_API_KEY ? 'configured' : 'not configured',
-    api_secret: process.env.CLOUDINARY_API_SECRET ? 'configured' : 'not configured'
-  };
-  console.log('Cloudinary config status:', cloudinaryConfig);
-
   try {
+    console.log('=== Update Profile Request ===');
+    console.log('Params:', req.params);
+    console.log('Headers:', req.headers);
+    console.log('Request body:', req.body);
+    
+    // Log file info if present
+    if (req.file) {
+      console.log('Uploaded file info:', {
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer',
+        encoding: req.file.encoding
+      });
+    } else {
+      console.log('No file was uploaded with this request');
+    }
+    
+    // Debug: Log environment info
+    console.log('Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      cwd: process.cwd(),
+      __dirname,
+      time: new Date().toISOString()
+    });
+    
+    // Debug: Log Cloudinary config (without exposing secrets)
+    const cloudinaryConfig = {
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'not configured',
+      api_key: process.env.CLOUDINARY_API_KEY ? 'configured' : 'not configured',
+      api_secret: process.env.CLOUDINARY_API_SECRET ? 'configured' : 'not configured'
+    };
+    console.log('Cloudinary config status:', cloudinaryConfig);
+
     const userId = req.params.userId;
     
     // Validate user ID format
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       console.error('Invalid user ID format:', userId);
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID format',
@@ -388,9 +441,11 @@ const updateUserProfile = async (req, res) => {
     }
     
     // Check if user exists and is authorized
-    const currentUser = await User.findById(userId).select('-password -__v -refreshToken');
+    const currentUser = await User.findById(userId).select('-password -__v -refreshToken').session(session);
     if (!currentUser) {
       console.error('User not found with ID:', userId);
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -401,6 +456,8 @@ const updateUserProfile = async (req, res) => {
     // Check if the current user is authorized to update this profile
     if (currentUser._id.toString() !== req.user.id && req.user.role !== 'admin') {
       console.warn(`Unauthorized access attempt: User ${req.user.id} tried to update profile of user ${userId}`);
+      await session.abortTransaction();
+      session.endSession();
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this profile',
@@ -415,7 +472,7 @@ const updateUserProfile = async (req, res) => {
     const allowedUpdates = [
       'fullName', 'email', 'phoneNumber', 'bio', 
       'dateOfBirth', 'gender', 'country', 'profilePicture',
-      'username'  // Added username to allowed updates
+      'username'
     ];
     
     // Initialize updates object
@@ -439,6 +496,8 @@ const updateUserProfile = async (req, res) => {
     if (updatesToApply.username) {
       const usernameRegex = /^[a-z0-9._-]+$/;
       if (!usernameRegex.test(updatesToApply.username)) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: 'Username can only contain letters, numbers, dots, underscores, and hyphens'
@@ -448,10 +507,12 @@ const updateUserProfile = async (req, res) => {
       // Check if username is already taken by another user
       const existingUser = await User.findOne({ 
         username: updatesToApply.username,
-        _id: { $ne: userId } // Exclude current user from the check
-      });
+        _id: { $ne: userId }
+      }).session(session);
       
       if (existingUser) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: 'Username is already taken'
@@ -464,7 +525,7 @@ const updateUserProfile = async (req, res) => {
         typeof updates.profilePicture === 'object' && 
         Object.keys(updates.profilePicture).length === 0) {
       console.log('Empty profilePicture object received, removing it from updates');
-      delete updates.profilePicture;
+      delete updatesToApply.profilePicture;
     }
     
     // Handle profile picture upload if a new file is provided
@@ -487,6 +548,8 @@ const updateUserProfile = async (req, res) => {
       // Validate file buffer
       if (!req.file.buffer || !Buffer.isBuffer(req.file.buffer) || req.file.buffer.length === 0) {
         console.error('Invalid or empty file buffer received');
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: 'File upload failed: No file data received.',
@@ -499,6 +562,8 @@ const updateUserProfile = async (req, res) => {
       const isImage = req.file.mimetype.startsWith('image/');
       if (!isImage) {
         console.error('Uploaded file is not an image:', req.file.mimetype);
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: 'Invalid file type. Only image files are allowed.',
@@ -507,255 +572,196 @@ const updateUserProfile = async (req, res) => {
         });
       }
       
+      // File type validation with more specific error messages
+      const allowedMimeTypes = {
+        'image/jpeg': 'JPEG',
+        'image/png': 'PNG',
+        'image/gif': 'GIF',
+        'image/webp': 'WebP'
+      };
+      
+      if (!(req.file.mimetype in allowedMimeTypes)) {
+        const allowedTypes = Object.values(allowedMimeTypes).join(', ');
+        console.error('Invalid file type:', {
+          mimetype: req.file.mimetype,
+          allowed: Object.keys(allowedMimeTypes)
+        });
+        
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ 
+          success: false, 
+          message: `Unsupported file type. Please upload an image file (${allowedTypes}).`,
+          code: 'INVALID_FILE_TYPE',
+          allowedTypes: Object.keys(allowedMimeTypes)
+        });
+      }
+      
+      // File size check (5MB limit)
+      const maxFileSize = 5 * 1024 * 1024; // 5MB
+      if (req.file.size > maxFileSize) {
+        const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+        console.error('File size exceeds limit:', {
+          size: req.file.size,
+          sizeMB: fileSizeMB,
+          maxSize: '5MB'
+        });
+        
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ 
+          success: false, 
+          message: `File is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`,
+          code: 'FILE_TOO_LARGE',
+          maxSize: maxFileSize,
+          actualSize: req.file.size
+        });
+      }
+      
+      console.log('Preparing to upload file to Cloudinary...');
+      
       try {
-        // File type validation with more specific error messages
-        const allowedMimeTypes = {
-          'image/jpeg': 'JPEG',
-          'image/png': 'PNG',
-          'image/gif': 'GIF',
-          'image/webp': 'WebP'
-        };
+        // Convert buffer to base64 for Cloudinary
+        const base64Data = req.file.buffer.toString('base64');
+        const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
         
-        if (!(req.file.mimetype in allowedMimeTypes)) {
-          const allowedTypes = Object.values(allowedMimeTypes).join(', ');
-          console.error('Invalid file type:', {
-            mimetype: req.file.mimetype,
-            allowed: Object.keys(allowedMimeTypes)
-          });
-          
-          return res.status(400).json({ 
-            success: false, 
-            message: `Unsupported file type. Please upload an image file (${allowedTypes}).`,
-            code: 'INVALID_FILE_TYPE',
-            allowedTypes: Object.keys(allowedMimeTypes)
-          });
+        // Log Cloudinary configuration (without sensitive data)
+        console.log('Cloudinary config:', {
+          cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'missing',
+          folder: 'profiles',
+          transformation: '500x500 thumb, auto:good'
+        });
+        
+        // Verify Cloudinary configuration
+        if (!process.env.CLOUDINARY_CLOUD_NAME || 
+            !process.env.CLOUDINARY_API_KEY || 
+            !process.env.CLOUDINARY_API_SECRET) {
+          throw new Error('Cloudinary configuration is missing. Please check your environment variables.');
         }
         
-        // File size check (5MB limit) with human-readable error
-        const maxFileSize = 5 * 1024 * 1024; // 5MB
-        if (req.file.size > maxFileSize) {
-          const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
-          console.error('File size exceeds limit:', {
-            size: req.file.size,
-            sizeMB: fileSizeMB,
-            maxSize: '5MB'
-          });
-          
-          return res.status(400).json({ 
-            success: false, 
-            message: `File is too large (${fileSizeMB}MB). Maximum allowed size is 5MB.`,
-            code: 'FILE_TOO_LARGE',
-            maxSize: maxFileSize,
-            actualSize: req.file.size
-          });
-        }
-        
-        console.log('Preparing to upload file to Cloudinary...');
-        
-        try {
-          // Convert buffer to base64 for Cloudinary
-          const base64Data = req.file.buffer.toString('base64');
-          const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
-          
-          // Log Cloudinary configuration (without sensitive data)
-          console.log('Cloudinary config:', {
-            cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'missing',
+        // Log Cloudinary configuration status
+        console.log('Cloudinary configuration status:', {
+          cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'missing',
+          api_key: process.env.CLOUDINARY_API_KEY ? 'configured' : 'missing',
+          api_secret: process.env.CLOUDINARY_API_SECRET ? 'configured' : 'missing'
+        });
+
+        // Upload to Cloudinary with detailed error handling
+        const uploadResult = await new Promise((resolve, reject) => {
+          const uploadOptions = {
             folder: 'profiles',
-            transformation: '500x500 thumb, auto:good'
-          });
+            use_filename: true,
+            unique_filename: true,
+            resource_type: 'auto',
+            transformation: [
+              { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
+              { quality: 'auto:good' }
+            ]
+          };
           
-          // Upload to Cloudinary with detailed error handling
-          const uploadStartTime = Date.now();
-          const uploadResult = await new Promise((resolve, reject) => {
-            const uploadOptions = {
-              folder: 'profiles',
-              use_filename: true,
-              unique_filename: true,
-              resource_type: 'auto',
-              transformation: [
-                { width: 500, height: 500, gravity: 'face', crop: 'thumb' },
-                { quality: 'auto:good' }
-              ]
-            };
-            
-            console.log('Starting Cloudinary upload with options:', uploadOptions);
-            
-            cloudinary.uploader.upload(
-              dataUri,
-              uploadOptions,
-              (error, result) => {
-                const uploadTime = Date.now() - uploadStartTime;
-                if (error) {
-                  console.error('Cloudinary upload failed after', uploadTime, 'ms:', {
-                    error: error.message,
-                    http_code: error.http_code,
-                    name: error.name,
-                    code: error.code
-                  });
-                  reject(new Error(`Failed to upload image to Cloudinary: ${error.message}`));
-                } else if (!result) {
-                  console.error('Cloudinary returned empty result after', uploadTime, 'ms');
-                  reject(new Error('Cloudinary upload returned no result'));
-                } else if (!result.secure_url) {
-                  console.error('Cloudinary response missing secure_url:', result);
-                  reject(new Error('Cloudinary response is missing the secure URL'));
-                } else {
-                  console.log('Cloudinary upload successful in', uploadTime, 'ms', {
-                    bytes: result.bytes,
-                    format: result.format,
-                    width: result.width,
-                    height: result.height,
-                    url: result.secure_url.substring(0, 60) + '...'
-                  });
-                  resolve(result);
-                }
+          cloudinary.uploader.upload(
+            dataUri,
+            uploadOptions,
+            (error, result) => {
+              if (error) {
+                console.error('Cloudinary upload error:', error);
+                reject(new Error(`Failed to upload image to Cloudinary: ${error.message}`));
+              } else if (!result || !result.secure_url) {
+                reject(new Error('Cloudinary upload returned invalid response'));
+              } else {
+                resolve(result);
               }
-            );
-          });
-
-          // If we get here, upload was successful
-          updatesToApply.profilePicture = uploadResult.secure_url;
-          
-          // If user had a previous profile picture and it's from Cloudinary, delete it
-          if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary.com')) {
-            try {
-              const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
-              console.log('Deleting old profile picture with public ID:', publicId);
-              
-              const deleteResult = await cloudinary.uploader.destroy(`profiles/${publicId}`, {
-                invalidate: true
-              });
-              
-              console.log('Old profile picture deletion result:', {
-                result: deleteResult.result,
-                wasDeleted: deleteResult.result === 'ok',
-                publicId: publicId
-              });
-              
-            } catch (deleteError) {
-              // Don't fail the request if deletion of old image fails, but log it
-              console.error('Error deleting old profile picture (non-critical):', {
-                error: deleteError.message,
-                profilePicture: currentUser.profilePicture,
-                userId: currentUser._id
-              });
             }
+          );
+        });
+        
+        // Set the new profile picture URL
+        updatesToApply.profilePicture = uploadResult.secure_url;
+        
+        // If there was a previous profile picture, delete it from Cloudinary
+        if (currentUser.profilePicture) {
+          const oldProfilePicture = currentUser.profilePicture;
+          try {
+            // Extract public_id from the URL
+            const urlParts = oldProfilePicture.split('/');
+            const fileNameWithExtension = urlParts.pop();
+            const publicId = `profiles/${fileNameWithExtension.split('.')[0]}`;
+            
+            // Delete the old image from Cloudinary
+            const deleteResult = await cloudinary.uploader.destroy(publicId, {
+              invalidate: true
+            });
+            
+            console.log('Old profile picture deleted from Cloudinary:', {
+              publicId,
+              result: deleteResult.result,
+              wasDeleted: deleteResult.result === 'ok'
+            });
+            
+          } catch (deleteError) {
+            // Don't fail the request if deletion of old image fails, but log it
+            console.error('Error deleting old profile picture (non-critical):', {
+              error: deleteError.message,
+              profilePicture: oldProfilePicture,
+              userId: currentUser._id
+            });
           }
-        } catch (cloudinaryError) {
-          throw new Error(`Failed to upload image to Cloudinary: ${cloudinaryError.message}`);
         }
-      } catch (error) {
-        return res.status(500).json({ 
-          success: false, 
-          message: 'Failed to process profile picture',
-          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        
+      } catch (cloudinaryError) {
+        await session.abortTransaction();
+        session.endSession();
+        console.error('Cloudinary error:', cloudinaryError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to process image upload',
+          code: 'IMAGE_UPLOAD_ERROR',
+          error: process.env.NODE_ENV === 'development' ? cloudinaryError.message : undefined
         });
-      }
-    } else if (updates.profilePicture === '') {
-      // If profile picture is being removed
-      updatesToApply.profilePicture = '';
-      
-      // Delete old profile picture from Cloudinary if it exists
-      if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary')) {
-        try {
-          const publicId = currentUser.profilePicture.split('/').pop().split('.')[0];
-          await cloudinary.uploader.destroy(`profiles/${publicId}`);
-          console.log('Profile picture removed from Cloudinary');
-        } catch (cloudErr) {
-          console.error('Error removing profile picture:', cloudErr);
-          // Continue even if deletion fails
-        }
       }
     }
-
-    console.log('Applying updates to user:', updatesToApply);
     
-    // If no updates to apply, return current user
-    if (Object.keys(updatesToApply).length === 0) {
-      return res.json({
-        success: true,
-        message: 'No changes detected',
-        user: currentUser
-      });
-    }
-    
-    // Find and update the user with detailed error handling
-    let updatedUser;
-    try {
-      updatedUser = await User.findByIdAndUpdate(
-        userId,
-        { $set: updatesToApply },
-        { 
-          new: true, 
-          runValidators: true,
-          context: 'query' // Ensures validators run with the correct context
-        }
-      ).select('-password -__v -refreshToken -resetPasswordToken -resetPasswordExpire');
+    // Update the user in the database
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updatesToApply },
+      { new: true, runValidators: true, session }
+    ).select('-password -__v -refreshToken');
 
-      if (!updatedUser) {
-        console.error('User not found during update:', userId);
-        return res.status(404).json({ 
-          success: false, 
-          message: 'User not found or update failed',
-          code: 'USER_UPDATE_FAILED'
-        });
-      }
-      
-      console.log('User profile updated successfully:', {
-        userId: updatedUser._id,
-        updatedFields: Object.keys(updatesToApply),
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (updateError) {
-      console.error('Error updating user in database:', {
-        error: updateError.message,
-        name: updateError.name,
-        code: updateError.code,
-        stack: updateError.stack,
-        updates: updatesToApply,
-        userId: userId
-      });
-      
-      // Handle duplicate key errors (e.g., duplicate email)
-      if (updateError.code === 11000) {
-        const field = Object.keys(updateError.keyPattern)[0];
-        const message = `The ${field} is already in use. Please choose a different one.`;
-        
-        return res.status(409).json({
-          success: false,
-          message: message,
-          field: field,
-          code: 'DUPLICATE_KEY',
-          duplicateField: field
-        });
-      }
-      
-      // Handle validation errors
-      if (updateError.name === 'ValidationError') {
-        const errors = Object.values(updateError.errors).map(err => ({
-          field: err.path,
-          message: err.message,
-          type: err.kind
-        }));
-        
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          code: 'VALIDATION_ERROR',
-          errors: errors
-        });
-      }
-      
-      // For any other database errors
-      return res.status(500).json({
+    if (!updatedUser) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
         success: false,
-        message: 'Failed to update user profile due to a database error',
-        code: 'DATABASE_ERROR',
-        error: process.env.NODE_ENV === 'development' ? updateError.message : undefined
+        message: 'User not found',
+        code: 'USER_NOT_FOUND'
       });
     }
-    
+
+    // If profile picture was updated, notify followers
+    if (updatesToApply.profilePicture) {
+      try {
+        await notifyProfilePictureUpdate(updatedUser._id);
+        console.log('Notified followers about profile picture update');
+      } catch (notifyError) {
+        // Don't fail the request if notification fails, but log it
+        console.error('Error notifying followers about profile picture update:', {
+          error: notifyError.message,
+          userId: updatedUser._id
+        });
+      }
+    }
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    console.log('User profile updated successfully:', {
+      userId: updatedUser._id,
+      updatedFields: Object.keys(updatesToApply),
+      timestamp: new Date().toISOString()
+    });
+
     // Prepare the success response
     const response = {
       success: true,
@@ -776,34 +782,44 @@ const updateUserProfile = async (req, res) => {
       updatedAt: updatedUser.updatedAt,
       timestamp: new Date().toISOString()
     };
-    
+
     // If profile picture was updated, include additional info
-    if (updatesToApply.profilePicture !== undefined) {
+    if (updatesToApply.profilePicture) {
       response.profileUpdate = {
         pictureUpdated: true,
         newUrl: updatedUser.profilePicture
       };
     }
-    
+
     // Send the success response
-    res.status(200).json(response);
+    return res.status(200).json(response);
+
   } catch (error) {
+    // Abort the transaction in case of any error
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    session.endSession();
+    
     console.error('Error updating user profile:', {
       error: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      code: error.code
     });
     
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => ({
         field: err.path,
-        message: err.message
+        message: err.message,
+        type: err.kind
       }));
       
       return res.status(400).json({
         success: false,
         message: 'Validation error',
+        code: 'VALIDATION_ERROR',
         errors
       });
     }
@@ -811,17 +827,21 @@ const updateUserProfile = async (req, res) => {
     // Handle duplicate key errors (e.g., duplicate email)
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: `${field.charAt(0).toUpperCase() + field.slice(1)} already in use`,
-        field
+        message: `${field.charAt(0).toUpperCase() + field.slice(1)} is already in use. Please choose a different one.`,
+        field,
+        code: 'DUPLICATE_KEY',
+        duplicateField: field
       });
     }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
+
+    // Handle other errors
+    return res.status(500).json({
+      success: false,
+      message: 'An unexpected error occurred while updating the profile',
+      code: 'SERVER_ERROR',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -851,103 +871,168 @@ const getUsers = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting users:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// @desc    Get user posts
-// @route   GET /api/users/:userId/posts
-// @access  Private
-const getUserPosts = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const posts = await Post.find({ author: req.params.userId })
-      .populate('author', 'fullName profilePicture')
-      .populate({
-        path: 'comments.user',
-        select: 'fullName profilePicture'
-      })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Post.countDocuments({ author: req.params.userId });
-
-    res.json({
-      posts,
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      totalPosts: total
-    });
-  } catch (error) {
-    console.error('Error getting user posts:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// @desc    Logout user / clear token
-// @route   POST /api/users/logout
-// @access  Private
-const logoutUser = async (req, res) => {
-  try {
-    // Clear any existing cookies
-    res.clearCookie('jwt');
-    
-    // If using token in Authorization header, we can't directly invalidate it
-    // But we can send instructions to the client to clear their token
-    // In a production app, you might want to implement a token blacklist here
-    
-    res.status(200).json({ 
-      success: true,
-      message: 'Logged out successfully' 
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error during logout',
-      error: error.message
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
     });
   }
 };
 
 // @desc    Check if username is available
-// @route   GET /api/users/check-username
+// @route   GET /api/users/check-username/:username
+// @access  Public
+// @desc    Forgot password - Send reset token
+// @route   POST /api/users/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Check if email exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account with that email exists'
+      });
+    }
+
+    // Generate reset token (you might want to use a more secure method in production)
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    
+    // Set token and expiry (1 hour from now)
+    user.resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
+
+    await user.save({ validateBeforeSave: false });
+
+    // Create reset URL
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/users/reset-password/${resetToken}`;
+
+    // TODO: Send email with reset URL
+    console.log('Password reset URL:', resetUrl);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent',
+      // In production, don't send the token in the response
+      resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing forgot password request',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// @desc    Reset password
+// @route   PUT /api/users/reset-password/:token
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    // Hash the token to compare with stored hash
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Find user with matching token and check if it's not expired
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    // Update password and clear reset token
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    
+    await user.save();
+
+    // TODO: Send confirmation email
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting password',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// @desc    Check if username is available
+// @route   GET /api/users/check-username/:username
 // @access  Public
 const checkUsername = async (req, res) => {
   try {
-    const { username } = req.query;
+    const { username } = req.params;
     
-    if (!username) {
+    // Basic validation
+    if (!username || typeof username !== 'string' || username.trim().length < 3) {
       return res.status(400).json({
         success: false,
-        message: 'Username is required'
+        message: 'Username must be at least 3 characters long',
+        available: false
       });
     }
 
-    // Check if username matches the required pattern
-    const usernameRegex = /^[a-z0-9._-]+$/;
+    // Check if username follows allowed format (letters, numbers, dots, underscores, hyphens)
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/;
     if (!usernameRegex.test(username)) {
       return res.status(400).json({
         success: false,
-        message: 'Username can only contain letters, numbers, dots, underscores, and hyphens'
+        message: 'Username can only contain letters, numbers, dots, underscores, and hyphens',
+        available: false
       });
     }
 
-    // Check if username already exists
-    const existingUser = await User.findOne({ username });
-    
-    return res.status(200).json({
-      success: true,
-      available: !existingUser
+    // Check if username is already taken
+    const existingUser = await User.findOne({ 
+      username: username.toLowerCase() 
     });
-    
+
+    if (existingUser) {
+      return res.json({
+        success: true,
+        available: false,
+        message: 'Username is already taken'
+      });
+    }
+
+    // Username is available
+    res.json({
+      success: true,
+      available: true,
+      message: 'Username is available'
+    });
+
   } catch (error) {
     console.error('Error checking username:', error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'Error checking username availability',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -955,117 +1040,82 @@ const checkUsername = async (req, res) => {
   }
 };
 
-// @desc    Request password reset OTP
-// @route   POST /api/auth/forgot-password
-// @access  Public
-const forgotPassword = async (req, res) => {
+// @desc    Logout user / clear token
+// @route   POST /api/users/logout
+// @access  Private
+const logoutUser = (req, res) => {
   try {
-    const { phoneNumber } = req.body;
-
-    if (!phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required'
-      });
-    }
-
-    // Find user by phone number
-    const user = await User.findOne({ phoneNumber });
+    // Clear the token from client-side
+    // In a browser environment, this would be handled by removing the token from localStorage
+    // This endpoint is here for API consistency and to invalidate tokens if needed in the future
     
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No user found with this phone number'
-      });
-    }
-
-    // Generate a 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
-
-    // Save OTP and expiry to user document
-    user.resetPasswordToken = otp;
-    user.resetPasswordExpire = otpExpiry;
-    await user.save();
-
-    // TODO: In a production environment, you would send this OTP via SMS
-    console.log(`Password reset OTP for ${phoneNumber}: ${otp}`);
-
     res.status(200).json({
       success: true,
-      message: 'OTP sent to registered phone number',
-      // In production, don't send the OTP in the response
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
+      message: 'Successfully logged out'
     });
-
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error('Logout error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: 'Error during logout',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-// @desc    Reset password with OTP
-// @route   POST /api/auth/reset-password
+// @desc    Get all posts for a specific user
+// @route   GET /api/users/:userId/posts
 // @access  Public
-const resetPassword = async (req, res) => {
+const getUserPosts = async (req, res) => {
   try {
-    const { phoneNumber, otp, newPassword } = req.body;
-
-    // Validate input
-    if (!phoneNumber || !otp || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number, OTP, and new password are required'
-      });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters long'
-      });
-    }
-
-    // Find user by phone number and check OTP
-    const user = await User.findOne({
-      phoneNumber,
-      resetPasswordToken: otp,
-      resetPasswordExpire: { $gt: Date.now() }
-    });
-
+    const { userId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    
+    // Convert to numbers and validate
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
+    
+    // Check if user exists
+    const user = await User.findById(userId).select('username');
     if (!user) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        message: 'Invalid or expired OTP'
+        message: 'User not found'
       });
     }
 
-    // Update password and clear reset token
-    user.password = newPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save();
+    // Get posts with pagination
+    const query = { user: userId, isPublished: true };
+    
+    const [posts, total] = await Promise.all([
+      Post.find(query)
+        .sort({ createdAt: -1 })
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum)
+        .populate('user', 'username profilePicture')
+        .populate('likes', 'username')
+        .populate('comments.user', 'username profilePicture'),
+      
+      Post.countDocuments(query)
+    ]);
 
-    // Invalidate all existing tokens (optional)
-    // user.tokens = [];
-    // await user.save();
-
+    const totalPages = Math.ceil(total / limitNum);
 
     res.status(200).json({
       success: true,
-      message: 'Password reset successful. You can now login with your new password.'
+      count: posts.length,
+      page: pageNum,
+      totalPages,
+      totalPosts: total,
+      data: posts
     });
 
   } catch (error) {
-    console.error('Reset password error:', error);
+    console.error('Get user posts error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: 'Error fetching user posts',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

@@ -1,4 +1,6 @@
 import Tournament from '../models/Tournament.js';
+import { distributePrizes } from '../utils/distributePrizes.js';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import { Game } from '../models/Game.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -396,6 +398,8 @@ const registerPlayer = async (req, res) => {
 
     // Deduct entry fee
     user.balance -= tournament.entryFee;
+    //add entry fee to tournament prize pool
+    tournament.CollectPrize += tournament.entryFee;
     tournament.currentPlayers.push(playerId);
 
     // Save both
@@ -453,8 +457,29 @@ const getTournamentLeaderboard = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch leaderboard', error: error.message });
   }
 };
+const updateStatus = async (req, res) => {
+
+  try {
+    const { status  } = req.body;
+    const {tournamentId} = req.params;
+    console.log(tournamentId, status);
+    
+    const updated = await Tournament.findByIdAndUpdate(tournamentId,{status}, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ success: false, message: 'Tournament not found' });
+     if( status === 'completed' && !updated.prizeDistributed) {
+      // Distribute prizes if tournament is completed and not already distributed
+      await distributePrizes(tournamentId);
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Update failed', error: err.message });
+  }
+};
+  
 
 export {
+  updateStatus,
   createTournament,
   getTournaments,
   getTournamentById,
