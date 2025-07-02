@@ -9,9 +9,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node --experimental-modules --es-module-specifier-resolution=node index.js",
-    "dev": "NODE_ENV=development nodemon --experimental-modules --es-module-specifier-resolution=node index.js",
+    "dev": "cross-env NODE_ENV=development nodemon --experimental-modules --es-module-specifier-resolution=node index.js",
     "build": "echo \"Skipping environment check in build phase. Environment variables will be checked at runtime.\"",
-    "prod": "NODE_ENV=production node --experimental-modules --es-module-specifier-resolution=node index.js"
+    "prod": "cross-env NODE_ENV=production node --experimental-modules --es-module-specifier-resolution=node index.js"
   },
   "keywords": [],
   "author": "",
@@ -36,12 +36,14 @@
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
     "path-to-regexp": "^6.3.0",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@babel/core": "^7.23.0",
     "@babel/node": "^7.22.20",
     "@babel/preset-env": "^7.22.20",
+    "cross-env": "^7.0.3",
     "http-server": "^14.1.1",
     "terser": "^5.43.1"
   }

@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
 import mongoose from 'mongoose';
+import { createServer } from 'http';
+import { initSocket } from './config/socket.js';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
 import { isConfigured } from './config/cloudinary.js';
@@ -32,6 +34,15 @@ const __dirname = path.dirname(__filename);
 
 // Initialize express app
 const app = express();
+
+// Create HTTP server
+const server = createServer(app);
+
+// Initialize Socket.IO
+const io = initSocket(server);
+
+// Make io accessible in routes
+app.set('io', io);
 
 // Load environment variables
 try {
@@ -86,13 +97,8 @@ try {
   process.exit(1);
 }
 
-// Services will be initialized in startServer()
-
 // Trust proxy for production
 app.set('trust proxy', 1);
-
-// Initialize services
-let server;
 
 // Add your frontend URL to the allowed origins
 const allowedOrigins = [
@@ -460,11 +466,12 @@ const startServer = async () => {
     }
     
     // Start the server
-    const port = process.env.PORT || 10000;
-    const server = app.listen(port, () => {
-      console.log(`\n🚀 Server running on port ${port} (${process.env.NODE_ENV || 'development'} mode)`);
-      console.log(`🌐 API: http://localhost:${port}/api`);
-      console.log(`📝 API Documentation: http://localhost:${port}/api-docs`);
+    const PORT = process.env.PORT || 5000;
+    const server = app.listen(PORT, () => {
+      console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+      console.log(`Socket.IO server is running`);
+      console.log(`🌐 API: http://localhost:${PORT}/api`);
+      console.log(`📝 API Documentation: http://localhost:${PORT}/api-docs`);
       console.log('\nPress CTRL+C to stop the server\n');
     });
     
