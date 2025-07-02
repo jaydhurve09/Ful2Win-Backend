@@ -274,86 +274,119 @@ const validateReferralCode = async (req, res) => {
 
 // @desc    Process referral rewards when a referred user makes their first deposit
 // @param   {string} userId - The ID of the user who made the deposit
+// @param   {ClientSession} session - MongoDB session for transaction
 // @access  Private
 // Reward amounts in coins
-const REFERRER_BONUS = 50;
-const REFERRED_USER_BONUS = 50;
+const REFERRER_REWARD = 200;
+const REFEREE_REWARD = 100;
 
-const processReferralRewards = async (userId) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+const processReferralRewards = async (userId, session) => {
+  const sessionToUse = session || await mongoose.startSession();
+  let shouldEndSession = !session;
   
-  try {
-    // Find the referral record for this user
-    const referral = await Referral.findOne({ 
-      referredUser: userId,
-      status: 'pending',
-      rewardGiven: false 
-    }).session(session);
+  if (shouldEndSession) {
+    sessionToUse.startTransaction();
+  }
 
-    if (!referral) {
-      await session.abortTransaction();
-      session.endSession();
-      return null;
+  try {
+    console.log(`Processing referral rewards for user: ${userId}`);
+    
+    // Find the user who made the deposit
+    const user = await User.findById(userId).session(sessionToUse);
+    if (!user) {
+      throw new Error('User not found');
     }
 
-    // 1. Update the referral status to completed
-    referral.status = 'completed';
+    // Check if user was referred by someone
+    if (!user.referredBy) {
+      console.log('User was not referred by anyone');
+      return { success: true, message: 'No referral to process' };
+    }
+
+    // Find the referral record
+    const referral = await Referral.findOne({
+      referredUser: user._id,
+      rewardGiven: false
+    }).session(sessionToUse);
+
+    if (!referral) {
+      console.log('No pending referral found or rewards already given');
+      if (shouldEndSession) {
+        await sessionToUse.abortTransaction();
+        sessionToUse.endSession();
+      }
+      return { success: false, message: 'No pending referral or rewards already given' };
+    }
+
+    // Find the referrer's user document
+    const referrer = await User.findById(referral.referrer).session(sessionToUse);
+    if (!referrer) {
+      throw new Error('Referrer not found');
+    }
+
+    // Update the referral record to mark rewards as given
     referral.rewardGiven = true;
     referral.firstDepositAt = new Date();
-    referral.rewardAmount = REFERRER_BONUS; // Store the reward amount
-    await referral.save({ session });
+    referral.rewardAmount = REFERRER_REWARD;
+    await referral.save({ session: sessionToUse });
 
-    // 2. Reward the referrer
-    await Wallet.findOneAndUpdate(
-      { user: referral.referrer },
-      { 
-        $inc: { balance: REFERRER_BONUS },
-        $push: {
-          transactions: {
-            amount: REFERRER_BONUS,
-            type: 'credit',
-            description: 'Referral bonus',
-            reference: `REF_${referral._id}`,
-            status: 'completed',
-            createdAt: new Date()
-          }
-        }
-      },
-      { new: true, upsert: true, session }
-    );
+    // Update the referrer's wallet (add 200 coins)
+    let referrerWallet = await Wallet.findOne({ user: referrer._id }).session(sessionToUse);
+    if (!referrerWallet) {
+      referrerWallet = new Wallet({
+        user: referrer._id,
+        balance: 0,
+        transactions: []
+      });
+    }
+    
+    referrerWallet.balance += REFERRER_REWARD;
+    referrerWallet.transactions.push({
+      amount: REFERRER_REWARD,
+      type: 'credit',
+      description: `Referral bonus for ${user.fullName || user.phoneNumber}`,
+      reference: `REF-${referrer._id}-${Date.now()}`,
+      status: 'completed'
+    });
+    await referrerWallet.save({ session: sessionToUse });
 
-    // 3. Reward the referred user
-    await Wallet.findOneAndUpdate(
-      { user: userId },
-      { 
-        $inc: { balance: REFERRED_USER_BONUS },
-        $push: {
-          transactions: {
-            amount: REFERRED_USER_BONUS,
-            type: 'credit',
-            description: 'Signup bonus (referred by friend)',
-            reference: `REF_BONUS_${referral._id}`,
-            status: 'completed',
-            createdAt: new Date()
-          }
-        }
-      },
-      { new: true, upsert: true, session }
-    );
+    // Update the referred user's wallet (add 100 coins)
+    let userWallet = await Wallet.findOne({ user: user._id }).session(sessionToUse);
+    if (!userWallet) {
+      userWallet = new Wallet({
+        user: user._id,
+        balance: 0,
+        transactions: []
+      });
+    }
+    
+    userWallet.balance += REFEREE_REWARD;
+    userWallet.transactions.push({
+      amount: REFEREE_REWARD,
+      type: 'credit',
+      description: 'Welcome bonus for using a referral code',
+      reference: `WELCOME-${user._id}-${Date.now()}`,
+      status: 'completed'
+    });
+    await userWallet.save({ session: sessionToUse });
 
-    // 4. Update user's referral stats
-    await User.findByIdAndUpdate(
-      referral.referrer,
-      { $inc: { 'referralStats.earnedCoins': REFERRER_BONUS } },
-      { session }
-    );
+    // Mark user as having received their first deposit bonus
+    user.hasMadeFirstDeposit = true;
+    await user.save({ session: sessionToUse });
 
-    await session.commitTransaction();
-    session.endSession();
+    // Commit the transaction if we started it
+    if (shouldEndSession) {
+      await sessionToUse.commitTransaction();
+      sessionToUse.endSession();
+    }
 
-    console.log(`Successfully processed referral rewards for user ${userId}. Referrer: ${referral.referrer}`);
-    return referral;
+    console.log(`Successfully processed referral rewards for user: ${userId}`);
+    return {
+      success: true,
+      message: 'Referral rewards processed successfully',
+      referrerReward: REFERRER_REWARD,
+      refereeReward: REFEREE_REWARD
+    };
   } catch (error) {
     console.error('Error processing referral rewards:', error);
     throw error;

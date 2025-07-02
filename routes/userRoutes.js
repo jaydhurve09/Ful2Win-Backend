@@ -8,7 +8,9 @@ import {
   updateUserProfile,
   getUsers,
   getUserPosts,
-  checkUsername
+  checkUsername,
+  forgotPassword,
+  resetPassword
 } from '../controllers/userController.js';
 import { protect, admin, testToken } from '../middleware/authMiddleware.js';
 import { uploadSingle, handleMulterError } from '../middleware/uploadMiddleware.js';
@@ -20,7 +22,12 @@ const router = express.Router();
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
-router.get('/check-username', checkUsername);
+router.get('/check-username/:username', checkUsername);
+router.get('/:userId/posts', getUserPosts);
+
+// Password reset routes
+router.post('/forgot-password', forgotPassword);
+router.put('/reset-password/:token', resetPassword);
 
 
 // Test endpoint to check request body parsing
@@ -96,12 +103,21 @@ router.put(
   uploadSingle('profilePicture'),
   (req, res, next) => {
     try {
-      console.log('=== Profile Update Request ===');
-      console.log('Headers:', req.headers);
-      console.log('Content-Type:', req.get('Content-Type'));
-      console.log('Content-Length:', req.get('Content-Length'));
+      // Log the incoming request
+      console.log('=== Profile Update Request ===', {
+        method: req.method,
+        url: req.originalUrl,
+        headers: {
+          'content-type': req.get('content-type'),
+          'content-length': req.get('content-length'),
+          'authorization': req.get('authorization') ? 'present' : 'missing'
+        },
+        body: Object.keys(req.body || {}),
+        files: req.files ? Object.keys(req.files) : 'no files',
+        file: req.file ? 'file present' : 'no file'
+      });
       
-      // Parse JSON data from form fields if present
+      // Handle JSON data if sent as form-data
       if (req.body.data) {
         try {
           const parsedData = JSON.parse(req.body.data);
@@ -109,6 +125,11 @@ router.put(
           delete req.body.data;
         } catch (e) {
           console.error('Error parsing JSON data:', e);
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid JSON data in form field',
+            error: e.message
+          });
         }
       }
       

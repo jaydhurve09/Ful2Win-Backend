@@ -93,11 +93,31 @@ const verifyAndUpdateWallet = async (req, res) => {
       wallet.balance += parseFloat(amount);
       
       // Check if this is user's first deposit
-      const user = await User.findById(userId);
-      const isFirstDeposit = !user.hasMadeFirstDeposit;
-      
-      // Update wallet balance
-      wallet.balance += amount;
+    const user = await User.findById(userId).session(session);
+    const isFirstDeposit = !user.hasMadeFirstDeposit;
+    
+    // Update wallet balance
+    wallet.balance += parseFloat(amount);
+    
+    // Process referral rewards if this is the first deposit
+    if (isFirstDeposit && user.referredBy) {
+      try {
+        // Import the referral controller
+        const { processReferralRewards } = await import('./referralController.js');
+        
+        // Process the referral rewards
+        await processReferralRewards(user._id.toString(), session);
+        
+        // Mark user as having made their first deposit
+        user.hasMadeFirstDeposit = true;
+        await user.save({ session });
+        
+        console.log(`Processed referral rewards for user: ${user._id}`);
+      } catch (error) {
+        console.error('Error processing referral rewards:', error);
+        // Don't fail the transaction if referral rewards fail
+      }
+    }
       wallet.transactions.push({
         amount,
         type: 'credit',
