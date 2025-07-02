@@ -491,3 +491,4 @@ export { app, startServer };
 
 // For backward compatibility
 export default { app, startServer };
+startServer();
