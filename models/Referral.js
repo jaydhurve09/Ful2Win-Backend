@@ -4,7 +4,8 @@ const referralSchema = new mongoose.Schema({
   referrer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true
   },
   referredUser: {
     type: mongoose.Schema.Types.ObjectId,
@@ -18,7 +19,8 @@ const referralSchema = new mongoose.Schema({
   },
   rewardGiven: {
     type: Boolean,
-    default: false
+    default: false,
+    index: true
   },
   rewardAmount: {
     type: Number,
@@ -32,15 +34,14 @@ const referralSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
-referralSchema.index({ referrer: 1, rewardGiven: 1 });
-referralSchema.index({ referredUser: 1 }, { unique: true });
-
-// Prevent duplicate referrals
+// Compound index for common query patterns
 referralSchema.index(
-  { referrer: 1, referredUser: 1 },
-  { unique: true }
+  { referrer: 1, rewardGiven: 1 },
+  { name: 'referrer_rewardGiven' }
 );
+
+// No need for separate index on referredUser as it's already unique
+// No need for compound index on {referrer, referredUser} as referredUser is already unique
 
 const Referral = mongoose.model('Referral', referralSchema);
 

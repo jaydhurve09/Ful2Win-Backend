@@ -14,46 +14,53 @@ const configureCloudinary = () => {
 
   console.log('[Cloudinary] Loading configuration...');
   
-  // Get environment variables with fallbacks
-  const cloudName = process.env.CLOUDINARY_NAME || process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_KEY;
-  const apiSecret = process.env.CLOUDINARY_SECRET_KEY || process.env.CLOUDINARY_SECRET;
-  
-  console.log('[Cloudinary] Environment variables:', {
-    CLOUDINARY_NAME: cloudName ? 'Set' : 'Not set',
-    CLOUDINARY_API_KEY: apiKey ? 'Set' : 'Not set',
-    CLOUDINARY_SECRET_KEY: apiSecret ? 'Set' : 'Not set',
-    NODE_ENV: process.env.NODE_ENV || 'development'
-  });
-  
-  if (!cloudName || !apiKey || !apiSecret) {
-    const error = new Error('Missing required Cloudinary configuration');
-    console.error('[Cloudinary] Configuration error:', error.message);
-    console.error('[Cloudinary] Please check your .env file and ensure all required variables are set');
-    throw error;
-  }
-  
-  const config = {
-    cloud_name: cloudName,
-    api_key: apiKey,
-    api_secret: apiSecret,
-    secure: true
-  };
-  
-  console.log('[Cloudinary] Initializing with config:', {
-    ...config,
-    api_key: config.api_key ? '***' + config.api_key.slice(-4) : 'Not set',
-    api_secret: '***' + (config.api_secret ? config.api_secret.slice(-4) : '')
-  });
-  
   try {
+    // Get environment variables with fallbacks
+    const cloudName = process.env.CLOUDINARY_NAME || process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_KEY;
+    const apiSecret = process.env.CLOUDINARY_SECRET_KEY || process.env.CLOUDINARY_SECRET;
+    
+    const envStatus = {
+      CLOUDINARY_NAME: cloudName ? 'Set' : 'Not set',
+      CLOUDINARY_API_KEY: apiKey ? 'Set' : 'Not set',
+      CLOUDINARY_SECRET_KEY: apiSecret ? 'Set' : 'Not set',
+      NODE_ENV: process.env.NODE_ENV || 'development'
+    };
+    
+    console.log('[Cloudinary] Environment status:', envStatus);
+    
+    // If any required variable is missing, log a warning but don't throw
+    if (!cloudName || !apiKey || !apiSecret) {
+      const missing = [];
+      if (!cloudName) missing.push('CLOUDINARY_CLOUD_NAME');
+      if (!apiKey) missing.push('CLOUDINARY_API_KEY');
+      if (!apiSecret) missing.push('CLOUDINARY_API_SECRET');
+      
+      console.warn(`[Cloudinary] Missing configuration: ${missing.join(', ')}`);
+      console.warn('[Cloudinary] Cloudinary features will be disabled');
+      return false;
+    }
+    
+    const config = {
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true
+    };
+    
+    console.log('[Cloudinary] Initializing with config:', {
+      cloud_name: config.cloud_name,
+      api_key: config.api_key ? '***' + config.api_key.slice(-4) : 'Not set',
+      api_secret: '***' + (config.api_secret ? config.api_secret.slice(-4) : '')
+    });
+    
     cloudinary.config(config);
     isConfigured = true;
     console.log('[Cloudinary] Configuration successful');
     return true;
   } catch (error) {
-    console.error('[Cloudinary] Configuration failed:', error);
-    throw error;
+    console.error('[Cloudinary] Configuration failed:', error.message);
+    return false;
   }
 };
 
@@ -144,16 +151,25 @@ const connectCloudinary = async () => {
   try {
     // Configure Cloudinary if not already configured
     if (!isConfigured) {
-      configureCloudinary();
+      const configured = configureCloudinary();
+      if (!configured) {
+        console.warn('[Cloudinary] Skipping connection test - Configuration incomplete');
+        return false;
+      }
     }
     
-    // Test the connection by making a simple API call
-    const result = await cloudinary.api.ping();
-    console.log('[Cloudinary] Connection test successful:', result);
-    return true;
+    try {
+      // Test the connection by making a simple API call
+      const result = await cloudinary.api.ping();
+      console.log('[Cloudinary] Connection test successful');
+      return true;
+    } catch (pingError) {
+      console.warn('[Cloudinary] Connection test failed, but continuing without Cloudinary');
+      console.warn('[Cloudinary] Error details:', pingError.message);
+      return false;
+    }
   } catch (error) {
-    console.error('[Cloudinary] Connection test failed:', error.message);
-    // Don't throw here to allow the server to start without Cloudinary if it's not critical
+    console.error('[Cloudinary] Error during connection:', error.message);
     return false;
   }
 };
