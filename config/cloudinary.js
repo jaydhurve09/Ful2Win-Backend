@@ -18,7 +18,7 @@ const configureCloudinary = () => {
     // Get environment variables with fallbacks
     const cloudName = process.env.CLOUDINARY_NAME || process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_KEY;
-    const apiSecret = process.env.CLOUDINARY_SECRET_KEY || process.env.CLOUDINARY_SECRET||process.env.CLOUDINARY_API_SECRET;
+    const apiSecret = process.env.CLOUDINARY_SECRET_KEY || process.env.CLOUDINARY_SECRET;
     
     const envStatus = {
       CLOUDINARY_NAME: cloudName ? 'Set' : 'Not set',
