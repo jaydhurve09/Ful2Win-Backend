@@ -6,7 +6,7 @@ import Tournament from "../models/Tournament.js";
   try {
     const { userId, userName, score, roomId, gameName } = req.body;
     console.log("Received score submission:", req.body);
-
+         
     if (!userId || score === undefined || score === null || !roomId || !gameName) {
       return res.status(400).json({ message: "All fields are required" });
     }

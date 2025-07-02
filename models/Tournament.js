@@ -110,7 +110,8 @@ const tournamentSchema = new mongoose.Schema({
     required: true
   },
   endTime: {
-    type: Date
+    type: Date,
+    required: true
   },
   prizeDistributed: {
   type: Boolean,

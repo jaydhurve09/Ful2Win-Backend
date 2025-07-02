@@ -26,9 +26,9 @@ const registerUser = async (req, res) => {
     console.log('=== Register User Request ===');
     console.log('Request body:', req.body);
     
-    const { fullName, phoneNumber, password, referralCode } = req.body;
+    const { fullName, phoneNumber, password,email, referralCode } = req.body;
 
-    if (!fullName || !phoneNumber || !password) {
+    if (!fullName || !phoneNumber || !password|| !email) {
       console.log('Missing required fields');
       return res.status(400).json({ 
         success: false,
@@ -65,6 +65,7 @@ const registerUser = async (req, res) => {
     const userData = {
       fullName,
       phoneNumber,
+      email,
       password, // Password will be hashed by the pre-save hook in the User model
       Balance: 0,
       followers: [],
@@ -86,31 +87,50 @@ const registerUser = async (req, res) => {
       referralCode: newUser.referralCode,
       referredBy: newUser.referredBy
     });
-
-    // Create referral record if applicable
-    if (referrer) {
-      const Referral = (await import('../models/Referral.js')).default;
-      await Referral.create([{
-        referrer: referrer._id,
-        referredUser: newUser._id,
-        referralCode: referrer.referralCode
-      }], { session });
-    }
-
-    // Commit the transaction
-    await session.commitTransaction();
-    session.endSession();
-
-    // Return user data (excluding password)
+ // generate a token and return them
+    const token = newUser.getSignedJwtToken();
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+    console.log('JWT token generated and set in cookie');
+    // Remove password from output
+    newUser.password = undefined;
+    console.log('Returning user data without password');
     res.status(201).json({
       success: true,
-      _id: newUser._id,
-      fullName: newUser.fullName,
-      phoneNumber: newUser.phoneNumber,
-      Balance: newUser.Balance,
-      referralCode: newUser.referralCode,
-      referredBy: newUser.referredBy
+      user: newUser,
+      token,
+      message: 'User registered successfully'
     });
+
+
+    // Create referral record if applicable
+    // if (referrer) {
+    //   const Referral = (await import('../models/Referral.js')).default;
+    //   await Referral.create([{
+    //     referrer: referrer._id,
+    //     referredUser: newUser._id,
+    //     referralCode: referrer.referralCode
+    //   }], { session });
+    // }
+
+    // // Commit the transaction
+    // await session.commitTransaction();
+    // session.endSession();
+
+    // // Return user data (excluding password)
+    // res.status(201).json({
+    //   success: true,
+    //   _id: newUser._id,
+    //   fullName: newUser.fullName,
+    //   phoneNumber: newUser.phoneNumber,
+    //   Balance: newUser.balance,
+    //   referralCode: newUser.referralCode,
+    //   referredBy: newUser.referredBy
+    // });
   } catch (error) {
     console.error('Error registering user:', error);
     console.error('Error stack:', error.stack);
