@@ -18,8 +18,7 @@ const referralSchema = new mongoose.Schema({
   },
   rewardGiven: {
     type: Boolean,
-    default: false,
-    index: true
+    default: false
   },
   rewardAmount: {
     type: Number,

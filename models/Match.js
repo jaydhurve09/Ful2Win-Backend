@@ -24,14 +24,12 @@ const matchSchema = new mongoose.Schema({
   tournamentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tournament',
-    index: true,
     sparse: true
   },
   gameId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Game',
-    required: true,
-    index: true
+    required: true
   },
   roomId: {
     type: String,
