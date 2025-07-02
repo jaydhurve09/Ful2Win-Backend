@@ -34,20 +34,24 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Load environment variables
-const envPath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
-console.log(`[Server] Loading environment from: ${envPath}`);
-console.log(`[Server] Current working directory: ${process.cwd()}`);
-
-// Load environment variables
 try {
-  const result = dotenv.config({ path: envPath });
-  if (result.error) {
-    console.error('[Server] Error loading .env file:', result.error);
-    process.exit(1);
+  if (process.env.NODE_ENV !== 'production') {
+    // In development, load from .env file
+    const envPath = '.env';
+    console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
+    
+    const result = dotenv.config({ path: envPath });
+    if (result.error) {
+      console.warn('[Server] Warning: Could not load .env file. Using process.env only.');
+    } else {
+      console.log(`[Server] Successfully loaded environment from ${envPath}`);
+    }
+  } else {
+    // In production, we expect all variables to be in process.env
+    console.log('[Server] Production mode - Using environment variables from process.env');
   }
-  
-  console.log(`[Server] Successfully loaded environment from ${envPath}`);
-  console.log('[Server] Successfully loaded .env file');
+
+  console.log(`[Server] Current working directory: ${process.cwd()}`);
 
   // Verify required environment variables
   const requiredEnvVars = [
@@ -62,9 +66,10 @@ try {
 
   const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
   if (missingVars.length > 0) {
-    console.error(`[Server] Missing required environment variables: ${missingVars.join(', ')}`);
-    process.exit(1);
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
+  
+  console.log('[Server] All required environment variables are set');
 
   // Log the Cloudinary config (masking sensitive values)
   if (process.env.CLOUDINARY_CLOUD_NAME) {
@@ -74,10 +79,10 @@ try {
       CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'Not set'
     });
   } else {
-    console.warn('[Server] Cloudinary environment variables not found in .env file');
+    console.warn('[Server] Cloudinary environment variables not found');
   }
 } catch (error) {
-  console.error('[Server] Error loading environment variables:', error);
+  console.error('[Server] Error during initialization:', error.message);
   process.exit(1);
 }
 
