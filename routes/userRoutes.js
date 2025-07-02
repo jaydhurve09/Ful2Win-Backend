@@ -11,9 +11,7 @@ import {
   updateUserProfile,
   getUsers,
   getUserPosts,
-  checkUsername,
-  forgotPassword,
-  resetPassword
+  getProfilePicture
 } from '../controllers/userController.js';
 import { protect, admin, testToken } from '../middleware/authMiddleware.js';
 import { uploadSingle, handleMulterError } from '../middleware/uploadMiddleware.js';
