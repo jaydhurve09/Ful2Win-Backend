@@ -87,6 +87,10 @@ const tournamentSchema = new mongoose.Schema({
     ref: 'Game',
     required: true
   },
+  CollectPrize: {
+    type:Number,
+    default: 0
+  },
   leaderboard: [leaderboardEntrySchema],
   entryFee: {
     type: Number,
@@ -108,6 +112,11 @@ const tournamentSchema = new mongoose.Schema({
   endTime: {
     type: Date
   },
+  prizeDistributed: {
+  type: Boolean,
+  default: false
+},
+
   maxPlayers: {
     type: Number,
     default: 100
