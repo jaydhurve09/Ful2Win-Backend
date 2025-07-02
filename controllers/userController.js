@@ -1,10 +1,72 @@
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { v2 as cloudinary } from 'cloudinary';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Post from '../models/Post.js';
+import path from 'path';
+
+// @desc    Get user profile picture
+// @route   GET /api/users/profile-picture/:userId
+// @access  Public
+const getProfilePicture = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('profilePicture');
+    
+    if (!user || !user.profilePicture) {
+      // Return default profile picture
+      const defaultImagePath = path.join(
+        dirname(fileURLToPath(import.meta.url)), 
+        '..', 
+        'public',
+        'images',
+        'default-profile.png'
+      );
+      return res.sendFile(defaultImagePath);
+    }
+
+    // If it's a URL, redirect to it
+    if (user.profilePicture.startsWith('http')) {
+      return res.redirect(user.profilePicture);
+    }
+
+    // If it's a local path, send the file
+    const imagePath = path.join(
+      dirname(fileURLToPath(import.meta.url)), 
+      '..', 
+      'uploads',
+      'profile-pictures',
+      user.profilePicture
+    );
+
+    if (fs.existsSync(imagePath)) {
+      return res.sendFile(imagePath);
+    }
+
+    // If file doesn't exist, return default
+    const defaultImagePath = path.join(
+      dirname(fileURLToPath(import.meta.url)), 
+      '..', 
+      'public',
+      'images',
+      'default-profile.png'
+    );
+    return res.sendFile(defaultImagePath);
+  } catch (error) {
+    console.error('Error getting profile picture:', error);
+    
+    // Return default image on error
+    const defaultImagePath = path.join(
+      dirname(fileURLToPath(import.meta.url)), 
+      '..', 
+      'public',
+      'images',
+      'default-profile.png'
+    );
+    return res.sendFile(defaultImagePath);
+  }
+};
 
 // Create __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -246,10 +308,27 @@ const getCurrentUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Clean user data before sending
-    const userData = user.toObject();
+    // Convert to plain object and clean sensitive data
+    const userData = user.toObject({ getters: true });
     
-    res.json(user);
+    // Ensure profilePicture exists in the response
+    if (!userData.hasOwnProperty('profilePicture')) {
+      userData.profilePicture = ''; // Ensure the field exists, even if null/undefined
+    }
+    
+    // Handle the profile picture URL
+    if (!userData.profilePicture) {
+      userData.profilePicture = ''; // Ensure empty string if falsy
+    } else if (!userData.profilePicture.startsWith('http') && 
+              !userData.profilePicture.startsWith('blob:')) {
+      // Only prepend base URL if it's not already a full URL or blob URL
+      userData.profilePicture = `${process.env.CLIENT_URL || 'http://localhost:3000'}${userData.profilePicture.startsWith('/') ? '' : '/'}${userData.profilePicture}`;
+    }
+    
+    res.json({
+      success: true,
+      data: userData
+    });
   } catch (error) {
     console.error('Error getting current user profile:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -995,6 +1074,7 @@ export {
   registerUser, 
   loginUser, 
   logoutUser,
+  getProfilePicture,
   forgotPassword,
   resetPassword,
   checkUsername,

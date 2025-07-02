@@ -3,12 +3,15 @@ import {
   registerUser, 
   loginUser,
   logoutUser,
+  forgotPassword,
+  resetPassword,
+  checkUsername,
   getUserProfile,
   getCurrentUserProfile,
   updateUserProfile,
   getUsers,
   getUserPosts,
-  checkUsername
+  getProfilePicture
 } from '../controllers/userController.js';
 import { protect, admin, testToken } from '../middleware/authMiddleware.js';
 import { uploadSingle, handleMulterError } from '../middleware/uploadMiddleware.js';
@@ -93,7 +96,34 @@ router.get('/profile/:userId', getUserProfile);
 router.put(
   '/profile/:userId', 
   protect,
-  uploadSingle('profilePicture'),
+  // Handle file upload with error handling
+  (req, res, next) => {
+    uploadSingle('profilePicture')(req, res, function(err) {
+      // Handle multer errors
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ 
+            success: false,
+            message: 'File too large. Maximum size is 5MB.'
+          });
+        } else if (err.code === 'INVALID_FILE_TYPE') {
+          return res.status(415).json({ 
+            success: false,
+            message: 'Invalid file type. Only images are allowed.'
+          });
+        } else if (err) {
+          console.error('File upload error:', err);
+          return res.status(400).json({ 
+            success: false,
+            message: 'Error uploading file',
+            error: err.message
+          });
+        }
+      }
+      next();
+    });
+  },
+  // Process the request
   (req, res, next) => {
     try {
       console.log('=== Profile Update Request ===');
@@ -144,7 +174,10 @@ router.put(
  * @desc    Get posts by user
  * @access  Private
  */
-router.get('/:userId/posts', getUserPosts);
+router.get('/:userId/posts', protect, getUserPosts);
+
+// Get user profile picture
+router.get('/profile-picture/:userId', getProfilePicture);
 
 // Admin routes
 router.use(admin);

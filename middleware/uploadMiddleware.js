@@ -146,88 +146,78 @@ const handleMulterError = (err, req, res, next) => {
 // Initialize multer with memory storage for Cloudinary
 const memoryStorage = multer.memoryStorage();
 
-// File filter for media uploads (images and videos)
+// File filter for profile picture uploads (images only)
 const mediaFileFilter = (req, file, cb) => {
-  const fileType = file.mimetype.split('/')[0];
-  
-  // Accept images and videos
-  if (!['image', 'video'].includes(fileType)) {
-    return cb(new Error('Only image and video files are allowed!'), false);
-  }
-  
-  // For now, accept all image and video files and let Cloudinary handle the validation
-  // We'll still check file size and basic security
-  try {
-    // Check file size (5MB for images, 50MB for videos)
-    const maxSize = fileType === 'image' ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return cb(new Error(`File is too large. Maximum size is ${maxSize / (1024 * 1024)}MB for ${fileType}s`), false);
-    }
-    
-    // Basic security check for executable files
-    if (file.originalname.match(/\.(php|exe|sh|bat|cmd|js|html?|css|jar|war|ear|apk|msi|dll|so|a|o|py|rb|pl|pm|t|pod|rdf|xml|xsd|xslt|xsl|rss|atom|json|jsonp|webmanifest|htaccess|htpasswd|ini|log|conf|cfg|reg|cmd|bat|vbs|ps1|psm1|psd1|ps1xml|psc1|pssc|cdxml|wsf|wsc|ws|wsh|msh|msh1|msh2|msh3|msh4|msh5|msh6|msh7|msh8|msh9|mshxml|msh1xml|msh2xml|msh3xml|msh4xml|msh5xml|msh6xml|msh7xml|msh8xml|msh9xml|msc1|msc2|msh1|msh2|msh3|msh4|msh5|msh6|msh7|msh8|msh9|mshxml|msh1xml|msh2xml|msh3xml|msh4xml|msh5xml|msh6xml|msh7xml|msh8xml|msh9xml|msc1|msc2)$/i)) {
-      return cb(new Error('Potentially malicious file detected'), false);
-    }
-    
-    return cb(null, true);
-  } catch (error) {
-    console.error('Error in media file filter:', error);
+  // Only accept image files
+  if (!file.mimetype.startsWith('image/')) {
+    const error = new Error('Only image files are allowed for profile pictures!');
+    error.code = 'INVALID_FILE_TYPE';
     return cb(error, false);
   }
+  
+  // Check for allowed image types
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    const error = new Error('Invalid file type. Only JPG, PNG, GIF, and WebP images are allowed!');
+    error.code = 'INVALID_FILE_TYPE';
+    return cb(error, false);
+  }
+  
+  // File is valid
+  return cb(null, true);
 };
 
-// Initialize multer with configuration for media uploads
+// Initialize multer with configuration for profile picture uploads
 const upload = multer({
   storage: memoryStorage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max file size (for videos)
-    files: 10, // Allow multiple files per upload
-    fieldSize: 100 * 1024 * 1024, // 100MB max for form data
+    fileSize: 5 * 1024 * 1024, // 5MB max file size for profile pictures
+    files: 1, // Limit to 1 file per request
+    fields: 20 // Allow up to 20 non-file fields
   },
   fileFilter: mediaFileFilter
 });
 
-// Middleware for handling single file upload
+/**
+ * Middleware for handling single file upload for profile pictures
+ * @param {string} fieldName - The name of the file field in the form (should be 'profilePicture')
+ */
 const uploadSingle = (fieldName) => {
   return (req, res, next) => {
-    console.log(`[uploadSingle] Initializing upload for field: ${fieldName}`);
+    // Log the incoming request for debugging
+    console.log('Upload middleware - Request headers:', req.headers);
+    console.log('Upload middleware - Content-Type:', req.headers['content-type']);
     
-    const singleUpload = multer({
-      storage: memoryStorage,
-      fileFilter: mediaFileFilter,
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 1,
-        fields: 20, // Allow other form fields
-        parts: 30   // Total parts (files + fields)
-      }
-    }).single(fieldName);
-
-    singleUpload(req, res, (err) => {
+    const uploadSingleFile = upload.single(fieldName);
+    
+    uploadSingleFile(req, res, (err) => {
       if (err) {
-        console.error('[uploadSingle] Upload error:', {
-          message: err.message,
+        console.error('File upload error:', {
           code: err.code,
-          field: err.field,
-          storageErrors: err.storageErrors
+          message: err.message,
+          stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
-        
-        let errorMessage = 'Error uploading file';
-        let statusCode = 400;
         
         // Handle specific multer errors
         if (err.code === 'LIMIT_FILE_SIZE') {
-          errorMessage = 'File size too large. Maximum size is 5MB.';
-          statusCode = 413; // Payload Too Large
-        } else if (err.code === 'LIMIT_FILE_COUNT') {
-          errorMessage = 'Too many files. Only one file is allowed.';
-        } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-          errorMessage = `Unexpected file field. Expected field name: ${fieldName}`;
+          return res.status(413).json({
+            success: false,
+            message: 'Profile picture is too large. Maximum size is 5MB.'
+          });
         }
         
-        return res.status(statusCode).json({
+        if (err.code === 'INVALID_FILE_TYPE') {
+          return res.status(415).json({
+            success: false,
+            message: 'Invalid file type. Only JPG, PNG, GIF, and WebP images are allowed.'
+          });
+        }
+        
+        // Handle other multer errors
+        return res.status(400).json({
           success: false,
-          message: errorMessage,
+          message: 'Error uploading profile picture',
+          error: process.env.NODE_ENV === 'development' ? err.message : 'Upload failed',
           code: err.code || 'UPLOAD_ERROR'
         });
       }
