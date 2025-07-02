@@ -9,9 +9,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node --experimental-modules --es-module-specifier-resolution=node index.js",
-    "dev": "nodemon --experimental-modules --es-module-specifier-resolution=node index.js",
-    "build": "echo \"Build complete\"",
-    "prod": "NODE_ENV=production node --experimental-modules --es-module-specifier-resolution=node index.js"
+    "dev": "cross-env NODE_ENV=development nodemon --experimental-modules --es-module-specifier-resolution=node index.js",
+    "build": "echo \"Skipping environment check in build phase. Environment variables will be checked at runtime.\"",
+    "prod": "cross-env NODE_ENV=production node --experimental-modules --es-module-specifier-resolution=node index.js"
   },
   "keywords": [],
   "author": "",
@@ -24,7 +24,7 @@
     "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "express": "^4.18.2",
     "express-fileupload": "^1.5.1",
     "jsonwebtoken": "^9.0.2",
@@ -34,14 +34,17 @@
     "multer": "^2.0.1",
     "ngrok": "^5.0.0-beta.2",
     "node-fetch": "^3.3.2",
+    "node-schedule": "^2.1.1",
     "nodemon": "^3.1.10",
     "path-to-regexp": "^6.3.0",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@babel/core": "^7.23.0",
     "@babel/node": "^7.22.20",
     "@babel/preset-env": "^7.22.20",
+    "cross-env": "^7.0.3",
     "http-server": "^14.1.1",
     "terser": "^5.43.1"
   }
