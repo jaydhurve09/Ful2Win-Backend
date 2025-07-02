@@ -9,8 +9,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node --experimental-modules --es-module-specifier-resolution=node index.js",
-    "dev": "nodemon --experimental-modules --es-module-specifier-resolution=node index.js",
-    "build": "echo \"Build complete\"",
+    "dev": "NODE_ENV=development nodemon --experimental-modules --es-module-specifier-resolution=node index.js",
+    "build": "echo \"Skipping environment check in build phase. Environment variables will be checked at runtime.\"",
     "prod": "NODE_ENV=production node --experimental-modules --es-module-specifier-resolution=node index.js"
   },
   "keywords": [],
