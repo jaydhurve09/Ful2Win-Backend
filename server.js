@@ -454,13 +454,14 @@ app.use((err, req, res, next) => {
 
 // Start the server
 const startServer = async () => {
+  console.log('🔵 [startServer] Starting server initialization...');
   try {
     // Initialize database
-    console.log('Connecting to MongoDB...');
+    console.log('🔵 [startServer] Connecting to MongoDB...');
     await connectDB();
     
     // Initialize Cloudinary (non-blocking)
-    console.log('Initializing Cloudinary...');
+    console.log('🔵 [startServer] Initializing Cloudinary...');
     try {
       await connectCloudinary();
       console.log('✅ Cloudinary connected successfully');
@@ -470,7 +471,9 @@ const startServer = async () => {
     }
     
     // Start the server
+    console.log('🔵 [startServer] Starting HTTP server...');
     const PORT = process.env.PORT || 5000;
+    console.log(`🔵 [startServer] Using port: ${PORT}`);
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
       console.log(`Socket.IO server is running`);
@@ -517,7 +520,7 @@ const startServer = async () => {
     });
     
   } catch (error) {
-    console.error('Failed to initialize services:', error);
+    console.error('🔴 [startServer] Failed to initialize services:', error);
     process.exit(1);
   }
 };
