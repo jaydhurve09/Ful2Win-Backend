@@ -2,7 +2,8 @@ import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import Tournament from '../models/Tournament.js';
 import mongoose from 'mongoose';
-import schedule from 'node-schedule';
+import pkg from 'node-schedule';
+const schedule = pkg.default || pkg;
 
 // Map of scheduled jobs for tournament reminders
 const tournamentReminderJobs = new Map();
