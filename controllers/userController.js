@@ -324,8 +324,6 @@ const loginUser = async (req, res) => {
 // @access  Private
 const getUserProfile = async (req, res) => {
   try {
-    console.log('Fetching user profile for ID:', req.params.userId);
-    console.log('Authenticated user ID:', req.user?._id);
     
     const user = await User.findById(req.params.userId)
       .select('-password -__v -refreshToken')
@@ -333,20 +331,12 @@ const getUserProfile = async (req, res) => {
       .populate('posts', 'title content image likes comments');
 
     if (!user) {
-      console.log('User not found with ID:', req.params.userId);
       return res.status(404).json({ message: 'User not found' });
     }
 
-    console.log('Found user:', {
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      phoneNumber: user.phoneNumber
-    });
     
     res.json(user);
   } catch (error) {
-    console.error('Error getting user profile:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -412,32 +402,27 @@ const updateUserProfile = async (req, res) => {
   session.startTransaction();
   
   try {
-    console.log('=== Update Profile Request ===');
-    console.log('Params:', req.params);
-    console.log('Headers:', req.headers);
-    console.log('Request body:', req.body);
-    
     // Log file info if present
-    if (req.file) {
-      console.log('Uploaded file info:', {
-        fieldname: req.file.fieldname,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer',
-        encoding: req.file.encoding
-      });
-    } else {
-      console.log('No file was uploaded with this request');
-    }
+    // if (req.file) {
+    //   console.log('Uploaded file info:', {
+    //     fieldname: req.file.fieldname,
+    //     originalname: req.file.originalname,
+    //     mimetype: req.file.mimetype,
+    //     size: req.file.size,
+    //     buffer: req.file.buffer ? `Buffer(${req.file.buffer.length} bytes)` : 'No buffer',
+    //     encoding: req.file.encoding
+    //   });
+    // } else {
+    //   console.log('No file was uploaded with this request');
+    // }
     
     // Debug: Log environment info
-    console.log('Environment:', {
-      NODE_ENV: process.env.NODE_ENV,
-      cwd: process.cwd(),
-      __dirname,
-      time: new Date().toISOString()
-    });
+    // console.log('Environment:', {
+    //   NODE_ENV: process.env.NODE_ENV,
+    //   cwd: process.cwd(),
+    //   __dirname,
+    //   time: new Date().toISOString()
+    // });
     
     // Debug: Log Cloudinary config (without exposing secrets)
     const cloudinaryConfig = {
@@ -777,11 +762,11 @@ const updateUserProfile = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    console.log('User profile updated successfully:', {
-      userId: updatedUser._id,
-      updatedFields: Object.keys(updatesToApply),
-      timestamp: new Date().toISOString()
-    });
+    // console.log('User profile updated successfully:', {
+    //   userId: updatedUser._id,
+    //   updatedFields: Object.keys(updatesToApply),
+    //   timestamp: new Date().toISOString()
+    // });
 
     // Prepare the success response
     const response = {

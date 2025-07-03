@@ -1,7 +1,7 @@
-const Message = require('../models/Message');
+import Message from '../models/Message.js';
 
 // Send a message
-exports.sendMessage = async (req, res) => {
+export const sendMessage = async (req, res) => {
   try {
     const { recipient, content } = req.body;
     const sender = req.user._id; // assumes auth middleware
@@ -18,7 +18,7 @@ exports.sendMessage = async (req, res) => {
 };
 
 // Get messages between two users
-exports.getMessages = async (req, res) => {
+export const getMessages = async (req, res) => {
   try {
     const userId = req.user._id;
     const { otherUserId } = req.params;

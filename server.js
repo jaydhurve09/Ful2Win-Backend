@@ -1,12 +1,7 @@
-<<<<<<< HEAD
-=======
 import dotenv from 'dotenv';
-dotenv.config();
-
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 import express from 'express';
 import cors from 'cors';
-
+import messageRoutes from './routes/messageRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
@@ -28,22 +23,16 @@ import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
-<<<<<<< HEAD
 
 dotenv.config();
-=======
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
+
 // Handle uncaught exceptions
 console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
   console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
 });
-<<<<<<< HEAD
-// Get current directory name in ES module
-=======
 
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -256,7 +245,7 @@ const requestLogger = (req, res, next) => {
     if (headers[header]) headers[header] = '***REDACTED***';
   });
   
-  console.log('Headers:', JSON.stringify(headers, null, 2));
+  // console.log('Headers:', JSON.stringify(headers, null, 2));
   
   // Log query parameters
   if (Object.keys(req.query).length > 0) {
@@ -264,15 +253,15 @@ const requestLogger = (req, res, next) => {
   }
   
   // Log request body for non-GET requests
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    if (req.body && Object.keys(req.body).length > 0) {
-      console.log('Body:', JSON.stringify(req.body, null, 2));
-    }
+  // if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+  //   if (req.body && Object.keys(req.body).length > 0) {
+  //     console.log('Body:', JSON.stringify(req.body, null, 2));
+  //   }
     
-    if (req.files && Object.keys(req.files).length > 0) {
-      console.log('Files:', Object.keys(req.files).join(', '));
-    }
-  }
+  //   if (req.files && Object.keys(req.files).length > 0) {
+  //     console.log('Files:', Object.keys(req.files).join(', '));
+  //   }
+  // }
   
   // Store original response methods
   const originalJson = res.json;
@@ -348,6 +337,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/game', Gamerouter);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/follow', followRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Game routes - static files and game-specific endpoints
 app.use('/games', express.static(path.join(__dirname, 'games'), {
@@ -502,8 +492,7 @@ const startServer = async () => {
 // Export the app and startServer function
 export { app, startServer };
 
-// For backward compatibility
-<<<<<<< HEAD
+
 export default { app, startServer };
 // startServer();
 
@@ -512,9 +501,8 @@ export default { app, startServer };
 // if (import.meta.url === `${process.argv[1]}`) {
 //   startServer();
 // }
-=======
 //export default { app, startServer };
 if (import.meta.url === `file://${process.argv[1]}`) {
   startServer();
 }
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
+
