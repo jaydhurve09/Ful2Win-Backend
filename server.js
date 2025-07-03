@@ -1,9 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config();
-
 import express from 'express';
 import cors from 'cors';
-
+import messageRoutes from './routes/messageRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
@@ -19,18 +17,21 @@ import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 import walletRoutes from './routes/walletRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
-// import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import Scorerouter from './routes/ScoreRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
+
+dotenv.config();
+
 // Handle uncaught exceptions
 console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
   console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
 });
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -49,7 +50,6 @@ app.set('io', io);
 // Load environment variables
 try {
   if (process.env.NODE_ENV !== 'production') {
-    // In development, load from .env file
     const envPath = '.env';
     console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
 
@@ -60,7 +60,6 @@ try {
       console.log(`[Server] Successfully loaded environment from ${envPath}`);
     }
   } else {
-    // In production, we expect all variables to be in process.env
     console.log(`[Server] Production mode - Using environment variables from process.env`);
   }
 
@@ -114,10 +113,18 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Add FRONTEND_URL if it exists
-if (process.env.FRONTEND_URL || process.env.LOCAL) {
-  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '') || process.env.LOCAL.replace(/\/$/, '');
+if (process.env.FRONTEND_URL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
+  }
+}
+
+// Add LOCAL if it exists
+if (process.env.LOCAL) {
+  const localUrl = process.env.LOCAL.replace(/\/$/, '');
+  if (!allowedOrigins.includes(localUrl)) {
+    allowedOrigins.push(localUrl);
   }
 }
 
@@ -243,7 +250,7 @@ const requestLogger = (req, res, next) => {
     if (headers[header]) headers[header] = '***REDACTED***';
   });
   
-  console.log('Headers:', JSON.stringify(headers, null, 2));
+  // console.log('Headers:', JSON.stringify(headers, null, 2));
   
   // Log query parameters
   if (Object.keys(req.query).length > 0) {
@@ -251,15 +258,15 @@ const requestLogger = (req, res, next) => {
   }
   
   // Log request body for non-GET requests
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    if (req.body && Object.keys(req.body).length > 0) {
-      console.log('Body:', JSON.stringify(req.body, null, 2));
-    }
+  // if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+  //   if (req.body && Object.keys(req.body).length > 0) {
+  //     console.log('Body:', JSON.stringify(req.body, null, 2));
+  //   }
     
-    if (req.files && Object.keys(req.files).length > 0) {
-      console.log('Files:', Object.keys(req.files).join(', '));
-    }
-  }
+  //   if (req.files && Object.keys(req.files).length > 0) {
+  //     console.log('Files:', Object.keys(req.files).join(', '));
+  //   }
+  // }
   
   // Store original response methods
   const originalJson = res.json;
@@ -335,6 +342,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/score', Scorerouter);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/follow', followRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Game routes - static files and game-specific endpoints
 app.use('/games', express.static(path.join(__dirname, 'games'), {
@@ -432,13 +440,13 @@ const startServer = async () => {
       console.log('⚠️ Server will start without Cloudinary. Some features may not work.');
     }
 
-    // Start the server
-    console.log('🟢 [startServer] About to call app.listen...');
-    const PORT =5000;
+    // Start the server using the existing server instance
+    console.log('🟢 [startServer] About to start server...');
+    const PORT = process.env.PORT || 5000;
     console.log(`🔵 [startServer] Using port: ${PORT}`);
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
       console.log('✅ Socket.IO server is running');
       console.log(`🌐 API: http://localhost:${PORT}/api`);
       console.log(`📝 API Documentation: http://localhost:${PORT}/api-docs`);
@@ -489,8 +497,17 @@ const startServer = async () => {
 // Export the app and startServer function
 export { app, startServer };
 
-// For backward compatibility
+
+export default { app, startServer };
+// startServer();
+
+// module.exports = { app, startServer };
+
+// if (import.meta.url === `${process.argv[1]}`) {
+//   startServer();
+// }
 //export default { app, startServer };
 if (import.meta.url === `file://${process.argv[1]}`) {
   startServer();
 }
+

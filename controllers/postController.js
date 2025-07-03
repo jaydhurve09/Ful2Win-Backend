@@ -763,7 +763,9 @@ export {
 // Stub implementations for methods that are used in routes but not yet implemented
 const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find({}).sort({ createdAt: -1 });
+    const posts = await Post.find({})
+      .sort({ createdAt: -1 })
+      .populate('author', 'username fullName profilePicture');
     res.json(posts);
   } catch (error) {
     res.status(500).json({ message: error.message });
