@@ -1,6 +1,12 @@
+<<<<<<< HEAD
+=======
+import dotenv from 'dotenv';
+dotenv.config();
+
+>>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
@@ -22,15 +28,22 @@ import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
+<<<<<<< HEAD
 
 dotenv.config();
+=======
+>>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 // Handle uncaught exceptions
+console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
+  console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
 });
+<<<<<<< HEAD
 // Get current directory name in ES module
+=======
+
+>>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -52,16 +65,16 @@ try {
     // In development, load from .env file
     const envPath = '.env';
     console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
-    
+
     const result = dotenv.config({ path: envPath });
     if (result.error) {
-      console.warn('[Server] Warning: Could not load .env file. Using process.env only.');
+      console.warn(`[Server] Warning: Could not load .env file. Using process.env only.`);
     } else {
       console.log(`[Server] Successfully loaded environment from ${envPath}`);
     }
   } else {
     // In production, we expect all variables to be in process.env
-    console.log('[Server] Production mode - Using environment variables from process.env');
+    console.log(`[Server] Production mode - Using environment variables from process.env`);
   }
 
   console.log(`[Server] Current working directory: ${process.cwd()}`);
@@ -95,7 +108,7 @@ try {
     console.warn('[Server] Cloudinary environment variables not found');
   }
 } catch (error) {
-  console.error('[Server] Error during initialization:', error.message);
+  console.error(`[Server] Error during initialization: ${error.message}`);
   process.exit(1);
 }
 
@@ -323,17 +336,18 @@ app.use(fileUpload({
 }));
 
 // API Routes - organized by functionality
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/users', followRoutes); // Nested under users for better REST structure
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
-app.use('/api/score', Gamerouter);
 app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/referrals', referralRoutes);
+// app.use('/api/webhooks', webhookRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/game', Gamerouter);
 app.use('/api/notifications', notificationRoutes);
-// app.use('/api/webhooks', webhookRoutes); // Uncomment when ready
+app.use('/api/follow', followRoutes);
 
 // Game routes - static files and game-specific endpoints
 app.use('/games', express.static(path.join(__dirname, 'games'), {
@@ -433,7 +447,7 @@ const startServer = async () => {
 
     // Start the server
     console.log('🟢 [startServer] About to call app.listen...');
-    const PORT = process.env.PORT || 5000;
+    const PORT =5000;
     console.log(`🔵 [startServer] Using port: ${PORT}`);
 
     const server = app.listen(PORT, '0.0.0.0', () => {
@@ -489,6 +503,7 @@ const startServer = async () => {
 export { app, startServer };
 
 // For backward compatibility
+<<<<<<< HEAD
 export default { app, startServer };
 // startServer();
 
@@ -497,3 +512,9 @@ export default { app, startServer };
 // if (import.meta.url === `${process.argv[1]}`) {
 //   startServer();
 // }
+=======
+//export default { app, startServer };
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer();
+}
+>>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
