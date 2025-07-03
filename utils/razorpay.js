@@ -3,10 +3,12 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
+console.log('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID);
+console.log('RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET);
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: "rzp_test_aMbsRSQU00vVQ6",
+    key_secret: "aM0cgZA54mwwbJ3nv5KAE7fq"
 });
  const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
   const options = {
