@@ -55,32 +55,26 @@ const generateReferralCode = async (req, res) => {
 const getMyReferralCode = async (req, res) => {
   try {
     const userId = req.user._id;
-    
     // Get user with referral code
-    const user = await User.findById(userId).select('referralCode');
-    
+    let user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-    
-    // If user doesn't have a referral code yet (should be handled by pre-save hook)
+    // If user doesn't have a referral code, generate and save one
     if (!user.referralCode) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate referral code'
-      });
+      user.referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+      await user.save();
+      console.log(`[getMyReferralCode] Generated new referral code for user ${userId}: ${user.referralCode}`);
     }
-    
     res.status(200).json({
       success: true,
       referralCode: user.referralCode
     });
-    
   } catch (error) {
-    console.error('Error getting referral code:', error);
+    console.error('[getMyReferralCode] Error getting referral code:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get referral code',
@@ -162,35 +156,48 @@ const applyReferralCode = async (req, res) => {
 // @access  Private
 const getMyReferrals = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      console.warn('[getMyReferrals] No user in request. Unauthorized.');
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: user not authenticated',
+      });
+    }
+
     const userId = req.user._id;
-    
-    // Get user's referral code if not exists, generate one
+    console.log(`[getMyReferrals] userId: ${userId}`);
+
     let user = await User.findById(userId);
+    if (!user) {
+      console.warn(`[getMyReferrals] User not found for id: ${userId}`);
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
     if (!user.referralCode) {
-      // Generate a new referral code
       user.referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
       await user.save();
+      console.log(`[getMyReferrals] Generated new referral code for user ${userId}: ${user.referralCode}`);
     }
-    
-    // Get all referrals for this user
+
     const referrals = await Referral.find({ referrer: userId })
       .populate('referredUser', 'fullName email phoneNumber')
       .sort({ createdAt: -1 });
-    
-    // Calculate stats
+    console.log(`[getMyReferrals] Found ${referrals.length} referrals for user ${userId}`);
+
     const totalReferrals = referrals.length;
     const activeReferrals = referrals.filter(ref => ref.rewardGiven).length;
     const pendingReferrals = totalReferrals - activeReferrals;
-    
+
     res.status(200).json({
       success: true,
       referralCode: user.referralCode,
-      stats: {
-        totalReferrals,
-        activeReferrals,
-        pendingReferrals,
-        earnedCoins: activeReferrals * 50 // 50 coins per successful referral
-      },
+      totalReferrals,
+      activeReferrals,
+      pendingReferrals,
+      totalEarnings: activeReferrals * 50, // 50 coins per successful referral
       referrals: referrals.map(ref => ({
         id: ref._id,
         user: ref.referredUser,
@@ -198,15 +205,14 @@ const getMyReferrals = async (req, res) => {
         status: ref.rewardGiven ? 'active' : 'pending',
         rewardAmount: ref.rewardAmount,
         firstDepositAt: ref.firstDepositAt
-      }))
+      })),
     });
-    
   } catch (error) {
-    console.error('Error getting referral data:', error);
+    console.error('[getMyReferrals] Error getting referral data:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get referral data',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
