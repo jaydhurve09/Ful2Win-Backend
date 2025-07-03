@@ -17,7 +17,6 @@ import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 import walletRoutes from './routes/walletRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
-// import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
@@ -51,7 +50,6 @@ app.set('io', io);
 // Load environment variables
 try {
   if (process.env.NODE_ENV !== 'production') {
-    // In development, load from .env file
     const envPath = '.env';
     console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
 
@@ -62,7 +60,6 @@ try {
       console.log(`[Server] Successfully loaded environment from ${envPath}`);
     }
   } else {
-    // In production, we expect all variables to be in process.env
     console.log(`[Server] Production mode - Using environment variables from process.env`);
   }
 
@@ -116,10 +113,18 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Add FRONTEND_URL if it exists
-if (process.env.FRONTEND_URL || process.env.LOCAL) {
-  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '') || process.env.LOCAL.replace(/\/$/, '');
+if (process.env.FRONTEND_URL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
+  }
+}
+
+// Add LOCAL if it exists
+if (process.env.LOCAL) {
+  const localUrl = process.env.LOCAL.replace(/\/$/, '');
+  if (!allowedOrigins.includes(localUrl)) {
+    allowedOrigins.push(localUrl);
   }
 }
 
@@ -435,13 +440,13 @@ const startServer = async () => {
       console.log('⚠️ Server will start without Cloudinary. Some features may not work.');
     }
 
-    // Start the server
-    console.log('🟢 [startServer] About to call app.listen...');
-    const PORT =5000;
+    // Start the server using the existing server instance
+    console.log('🟢 [startServer] About to start server...');
+    const PORT = process.env.PORT || 5000;
     console.log(`🔵 [startServer] Using port: ${PORT}`);
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
       console.log('✅ Socket.IO server is running');
       console.log(`🌐 API: http://localhost:${PORT}/api`);
       console.log(`📝 API Documentation: http://localhost:${PORT}/api-docs`);
