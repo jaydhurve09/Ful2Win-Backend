@@ -45,8 +45,6 @@ const walletSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
-walletSchema.index({ user: 1 });
 
 const Wallet = mongoose.model('Wallet', walletSchema);
 

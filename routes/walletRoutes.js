@@ -3,7 +3,8 @@ import { protect } from '../middleware/authMiddleware.js';
 import { 
   createRazorpayOrder, 
   verifyAndUpdateWallet, 
-  getWalletBalance 
+  getWalletBalance,
+  updateSpinReward 
 } from '../controllers/walletController.js';
 
 const router = express.Router();
@@ -19,5 +20,8 @@ router.post('/verify-payment', verifyAndUpdateWallet);
 
 // Get wallet balance
 router.get('/balance', getWalletBalance);
+
+// Update wallet from spin wheel reward
+router.post('/spin-reward', protect, updateSpinReward);
 
 export default router;

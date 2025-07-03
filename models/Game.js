@@ -44,8 +44,7 @@ const gameSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: GAME_TYPES,
-    index: true
+    enum: GAME_TYPES
   },
   
   // Game description

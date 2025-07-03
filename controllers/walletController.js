@@ -184,8 +184,64 @@ const getWalletBalance = async (req, res) => {
   }
 };
 
+// @desc    Update wallet balance from spin wheel reward
+// @route   POST /api/wallet/spin-reward
+// @access  Private
+const updateSpinReward = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const userId = req.user._id;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid reward amount'
+      });
+    }
+
+    // Find user's wallet or create if it doesn't exist
+    let wallet = await Wallet.findOne({ user: userId });
+    
+    if (!wallet) {
+      wallet = new Wallet({
+        user: userId,
+        balance: 0,
+        transactions: []
+      });
+    }
+
+    // Update balance
+    wallet.balance += amount;
+    
+    // Add transaction record
+    wallet.transactions.push({
+      amount,
+      type: 'credit',
+      description: `Spin wheel reward: ${amount} coins`,
+      reference: `spin_${Date.now()}`,
+      status: 'completed'
+    });
+
+    await wallet.save();
+
+    res.status(200).json({
+      success: true,
+      balance: wallet.balance,
+      message: `Successfully added ${amount} coins to your wallet`
+    });
+  } catch (error) {
+    console.error('Error updating spin reward:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error processing spin reward',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 export {
   createRazorpayOrder,
   verifyAndUpdateWallet,
-  getWalletBalance
+  getWalletBalance,
+  updateSpinReward
 };

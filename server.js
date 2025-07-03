@@ -1,3 +1,4 @@
+require('dotenv').config(); // loads from .env by default
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -22,14 +23,14 @@ import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
-
+require('dotenv').config(); // loads from .env by default
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
   console.error(err.name, err.message);
   process.exit(1);
 });
-
+require('dotenv').config(); // loads from .env by default
 // Get current directory name in ES module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -153,9 +154,7 @@ const corsOptions = {
     'Pragma',
     'Expires',
     'Access-Control-Allow-Headers',
-    'Access-Control-Allow-Credentials',
-    'Accept',
-    'Origin'
+    'Access-Control-Allow-Credentials'
   ],
   exposedHeaders: [
     'Content-Length',
@@ -166,15 +165,6 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-// Parse JSON for all routes except webhooks (webhooks need raw body for signature verification)
-// app.use((req, res, next) => {
-//   if (req.originalUrl.startsWith('/api/webhooks')) {
-//     next();
-//   } else {
-//     express.json({ limit: '50mb' })(req, res, next);
-//   }
-// });
-
 // Apply CORS to all routes except webhooks
 app.use((req, res, next) => {
   if (req.originalUrl.startsWith('/api/webhooks')) {
@@ -182,29 +172,6 @@ app.use((req, res, next) => {
   } else {
     cors(corsOptions)(req, res, next);
   }
-});
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Simple health check endpoint
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
-});
-
-
-// Apply CORS to all routes
-app.options('*', cors(corsOptions)); // Enable preflight for all routes
-app.use(cors(corsOptions));
-
-// Add CORS headers to all responses
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Credentials', true);
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  next();
 });
 
 // Enable preflight for all routes
@@ -220,12 +187,13 @@ app.use(express.json({
 app.use(express.urlencoded({ 
   extended: true, 
   limit: '50mb',
-  type: ['application/x-www-form-urlencoded']
+  type: ['application/x-www-form-urlencoded'],
+  parameterLimit: 10000 // Increase parameter limit for large forms
 }));
 
-// Raw body parser for text/plain
+// Raw body parser for text/plain and other content types
 app.use((req, res, next) => {
-  if (req.is('text/*')) {
+  if (req.is('text/*') || req.is('application/xml') || req.is('application/xml-dtd')) {
     let data = '';
     req.setEncoding('utf8');
     req.on('data', (chunk) => { data += chunk; });
@@ -243,26 +211,6 @@ app.use((req, res, next) => {
   }
 });
 
-// Request logging middleware (production-friendly)
-app.use((req, res, next) => {
-  const start = Date.now();
-  const requestId = Math.random().toString(36).substring(2, 8);
-  req.requestId = requestId;
-
-  // Log only errors
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    if (res.statusCode >= 400) {
-      console.error(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
-    } else if (process.env.NODE_ENV === 'development') {
-      console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
-    }
-  });
-
-  next();
-});
-
-
 // Error handling for JSON parsing
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && 'body' in err) {
@@ -275,57 +223,27 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// API Routes
-app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/tournaments', tournamentRoutes);
-app.use('/api/car-racing', carRacingRoute);
-app.use('/api/score', Gamerouter); // Add the new game route
-app.use('/api/wallet', walletRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/users', followRoutes);
-// app.use('/api/webhooks', webhookRoutes);
-
-// Game routes
-app.use('/games/2d-car-racing', carRacingRoute); // This is the URL path
-
-// Alias for the game with the actual directory name
-app.use('/games/2d%20Car%20Racing%20Updated', carRacingRoute);
-
-// Serve static game files
-app.use('/games', express.static(path.join(__dirname, 'games')));
-
-// File upload configuration
-app.use(fileUpload({
-  useTempFiles: true,
-  tempFileDir: path.join(__dirname, 'tmp'),
-  createParentPath: true,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB max file size
-}));
-
-// Enhanced request logging middleware
-app.use((req, res, next) => {
+// Request logging middleware
+const requestLogger = (req, res, next) => {
   // Skip logging for static files and health checks
   if (req.path === '/health' || req.path.startsWith('/games/')) {
     return next();
   }
 
   const startTime = Date.now();
-  const requestId = Math.random().toString(36).substring(2, 8);
+  const requestId = req.requestId || Math.random().toString(36).substring(2, 8);
+  req.requestId = requestId;
   
   // Log request details
   console.log('\n' + '='.repeat(80));
   console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl}`);
-  console.log('-' * 80);
   
   // Log request headers (redact sensitive info)
   const headers = { ...req.headers };
   ['authorization', 'cookie', 'x-access-token'].forEach(header => {
     if (headers[header]) headers[header] = '***REDACTED***';
   });
+  
   console.log('Headers:', JSON.stringify(headers, null, 2));
   
   // Log query parameters
@@ -351,7 +269,7 @@ app.use((req, res, next) => {
   // Override response methods to log the response
   res.json = function(body) {
     const responseTime = Date.now() - startTime;
-    console.log('\n' + '-'.repeat(80));
+    console.log('\n' + '-'.repeat(40));
     console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
     console.log('Status:', res.statusCode);
     
@@ -369,7 +287,7 @@ app.use((req, res, next) => {
   
   res.send = function(body) {
     const responseTime = Date.now() - startTime;
-    console.log('\n' + '-'.repeat(80));
+    console.log('\n' + '-'.repeat(40));
     console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
     console.log('Status:', res.statusCode);
     
@@ -377,7 +295,7 @@ app.use((req, res, next) => {
     const responseStr = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
     if (responseStr && responseStr.length > 1000) {
       console.log('Response:', responseStr.substring(0, 1000) + '... [TRUNCATED]');
-    } else {
+    } else if (responseStr) {
       console.log('Response:', responseStr);
     }
     
@@ -385,20 +303,49 @@ app.use((req, res, next) => {
     return originalSend.call(this, body);
   };
   
-  // Log unhandled errors
-  res.on('finish', () => {
-    if (res.statusCode >= 400) {
-      console.error(`[${new Date().toISOString()}] [${requestId}] Error: ${res.statusCode} - ${res.statusMessage}`);
-    }
-  });
-  
   next();
-});
+};
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Apply the request logger middleware
+app.use(requestLogger);
+
+// File upload configuration - must come before routes that handle file uploads
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: path.join(__dirname, 'tmp'),
+  createParentPath: true,
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB max file size
+    files: 5, // Maximum number of files
+    abortOnLimit: true // Return 413 if file is too large
+  },
+  safeFileNames: true, // Strip special characters from file names
+  preserveExtension: 4 // Preserve file extension (up to 4 chars)
+}));
+
+// API Routes - organized by functionality
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/users', followRoutes); // Nested under users for better REST structure
+app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/score', Gamerouter);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/notifications', notificationRoutes);
+// app.use('/api/webhooks', webhookRoutes); // Uncomment when ready
+
+// Game routes - static files and game-specific endpoints
+app.use('/games', express.static(path.join(__dirname, 'games'), {
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache for static assets
+  }
+}));
+
+// Game route aliases
+app.use('/games/2d-car-racing', carRacingRoute);
+app.use('/games/2d%20Car%20Racing%20Updated', carRacingRoute);
 
 // Test endpoint for debugging
 app.get('/api/test', (req, res) => {
@@ -414,22 +361,31 @@ app.get('/api/test', (req, res) => {
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/follow', followRoutes);
 
-//Serve static game files
+// Serve static game files
 app.use('/games', express.static(path.join(__dirname, 'games')));
 
-// Simple request logging
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-  next();
+// Health check endpoint (moved up before other routes)
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString() 
+  });
 });
 
-// Basic route
+// Single root route
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Welcome to Ful2Win Backend API',
     status: 'running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || '1.0.0'
   });
 });
 
@@ -454,31 +410,41 @@ app.use((err, req, res, next) => {
 
 // Start the server
 const startServer = async () => {
+  console.log('🔵 [startServer] Starting server initialization...');
   try {
     // Initialize database
-    console.log('Connecting to MongoDB...');
-    await connectDB();
-    
+    console.log('🔵 [startServer] Connecting to MongoDB...');
+    try {
+      await connectDB();
+      console.log('✅ MongoDB connected successfully');
+    } catch (dbErr) {
+      console.error('❌ [startServer] MongoDB connection failed:', dbErr);
+      process.exit(1);
+    }
+
     // Initialize Cloudinary (non-blocking)
-    console.log('Initializing Cloudinary...');
+    console.log('🔵 [startServer] Initializing Cloudinary...');
     try {
       await connectCloudinary();
       console.log('✅ Cloudinary connected successfully');
     } catch (error) {
-      console.warn('⚠️ Cloudinary initialization warning:', error.message);
+      console.warn('⚠️ [startServer] Cloudinary initialization warning:', error.message);
       console.log('⚠️ Server will start without Cloudinary. Some features may not work.');
     }
-    
+
     // Start the server
+    console.log('🟢 [startServer] About to call app.listen...');
     const PORT = process.env.PORT || 5000;
-    const server = app.listen(PORT, () => {
-      console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-      console.log(`Socket.IO server is running`);
+    console.log(`🔵 [startServer] Using port: ${PORT}`);
+
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+      console.log('✅ Socket.IO server is running');
       console.log(`🌐 API: http://localhost:${PORT}/api`);
       console.log(`📝 API Documentation: http://localhost:${PORT}/api-docs`);
       console.log('\nPress CTRL+C to stop the server\n');
     });
-    
+
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (err) => {
       console.error('\n❌ UNHANDLED REJECTION! Shutting down...');
@@ -487,7 +453,7 @@ const startServer = async () => {
         process.exit(1);
       });
     });
-    
+
     // Handle SIGTERM for graceful shutdown
     process.on('SIGTERM', () => {
       console.log('\n👋 SIGTERM RECEIVED. Shutting down gracefully');
@@ -496,13 +462,12 @@ const startServer = async () => {
         process.exit(0);
       });
     });
-    
+
     // Handle server errors
     server.on('error', (error) => {
       if (error.syscall !== 'listen') {
         throw error;
       }
-
       // Handle specific listen errors with friendly messages
       switch (error.code) {
         case 'EACCES':
@@ -515,9 +480,8 @@ const startServer = async () => {
           throw error;
       }
     });
-    
   } catch (error) {
-    console.error('Failed to initialize services:', error);
+    console.error('🔴 [startServer] Failed to initialize services:', error);
     process.exit(1);
   }
 };
@@ -527,3 +491,4 @@ export { app, startServer };
 
 // For backward compatibility
 export default { app, startServer };
+startServer();
