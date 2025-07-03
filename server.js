@@ -27,12 +27,10 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
+  console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
 });
-//require('dotenv').config(); // loads from .env by default
-// Get current directory name in ES module
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -54,16 +52,16 @@ try {
     // In development, load from .env file
     const envPath = '.env';
     console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
-    
+
     const result = dotenv.config({ path: envPath });
     if (result.error) {
-      console.warn('[Server] Warning: Could not load .env file. Using process.env only.');
+      console.warn(`[Server] Warning: Could not load .env file. Using process.env only.`);
     } else {
       console.log(`[Server] Successfully loaded environment from ${envPath}`);
     }
   } else {
     // In production, we expect all variables to be in process.env
-    console.log('[Server] Production mode - Using environment variables from process.env');
+    console.log(`[Server] Production mode - Using environment variables from process.env`);
   }
 
   console.log(`[Server] Current working directory: ${process.cwd()}`);
@@ -97,7 +95,7 @@ try {
     console.warn('[Server] Cloudinary environment variables not found');
   }
 } catch (error) {
-  console.error('[Server] Error during initialization:', error.message);
+  console.error(`[Server] Error during initialization: ${error.message}`);
   process.exit(1);
 }
 
@@ -325,17 +323,18 @@ app.use(fileUpload({
 }));
 
 // API Routes - organized by functionality
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/users', followRoutes); // Nested under users for better REST structure
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
-app.use('/api/score', Gamerouter);
 app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/referrals', referralRoutes);
+// app.use('/api/webhooks', webhookRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/game', Gamerouter);
 app.use('/api/notifications', notificationRoutes);
-// app.use('/api/webhooks', webhookRoutes); // Uncomment when ready
+app.use('/api/follow', followRoutes);
 
 // Game routes - static files and game-specific endpoints
 app.use('/games', express.static(path.join(__dirname, 'games'), {
