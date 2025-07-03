@@ -1,45 +1,44 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
-import dotenv from 'dotenv';
 
-dotenv.config();
-console.log('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID);
-console.log('RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET);
+console.log('⚡ Using hardcoded Razorpay credentials');
 
 const razorpay = new Razorpay({
     key_id: "rzp_test_aMbsRSQU00vVQ6",
     key_secret: "aM0cgZA54mwwbJ3nv5KAE7fq"
 });
- const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
-  const options = {
-    amount: amount * 100, // Razorpay expects amount in paise
-    currency,
-    receipt,
-    payment_capture: 1
-  };
 
-  try {
-    const response = await razorpay.orders.create(options);
-    return response;
-  } catch (error) {
-    console.error('Error creating Razorpay order:', error);
-    throw error;
-  }
+const createOrder = async (amount, currency = 'INR', receipt = 'receipt#1') => {
+    const options = {
+        amount: amount * 100, // in paise
+        currency,
+        receipt,
+        payment_capture: 1
+    };
+
+    try {
+        const response = await razorpay.orders.create(options);
+        console.log('✅ Razorpay order created:', response.id);
+        return response;
+    } catch (error) {
+        console.error('❌ Error creating Razorpay order:', error);
+        throw error;
+    }
 };
 
- const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
-  const text = `${razorpayOrderId}|${razorpayPaymentId}`;
-  const generatedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-    .update(text)
-    .digest('hex');
+const verifyPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
+    const text = `${razorpayOrderId}|${razorpayPaymentId}`;
+    const generatedSignature = crypto
+        .createHmac('sha256', "aM0cgZA54mwwbJ3nv5KAE7fq") // 👈 hardcoded
+        .update(text)
+        .digest('hex');
 
-  return generatedSignature === razorpaySignature;
+    console.log('📝 Signature check:', generatedSignature === razorpaySignature);
+    return generatedSignature === razorpaySignature;
 };
 
-// Export both named exports and default export
 export {
-  createOrder,
-  verifyPayment,
-  razorpay as default
+    createOrder,
+    verifyPayment,
+    razorpay as default
 };
