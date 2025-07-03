@@ -26,6 +26,7 @@ import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
 // Handle uncaught exceptions
+console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
   console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
