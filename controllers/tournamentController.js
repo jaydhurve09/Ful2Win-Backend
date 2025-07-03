@@ -396,7 +396,11 @@ const registerPlayer = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient balance' });
     }
 
+
+    //add tournament to user's registered tournaments
+    user.tournaments.push(tournamentId);
     // Deduct entry fee
+
     user.balance -= tournament.entryFee;
     //add entry fee to tournament prize pool
     tournament.CollectPrize += tournament.entryFee;

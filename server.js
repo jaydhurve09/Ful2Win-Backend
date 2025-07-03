@@ -1,9 +1,6 @@
-<<<<<<< HEAD
-=======
 import dotenv from 'dotenv';
 dotenv.config();
 
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 import express from 'express';
 import cors from 'cors';
 
@@ -28,22 +25,12 @@ import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
-<<<<<<< HEAD
-
-dotenv.config();
-=======
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 // Handle uncaught exceptions
 console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
   console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
 });
-<<<<<<< HEAD
-// Get current directory name in ES module
-=======
-
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -503,18 +490,7 @@ const startServer = async () => {
 export { app, startServer };
 
 // For backward compatibility
-<<<<<<< HEAD
-export default { app, startServer };
-// startServer();
-
-// module.exports = { app, startServer };
-
-// if (import.meta.url === `${process.argv[1]}`) {
-//   startServer();
-// }
-=======
 //export default { app, startServer };
 if (import.meta.url === `file://${process.argv[1]}`) {
   startServer();
 }
->>>>>>> 14a3f3008c98e00778d171c7fff595fa1b6f5154
