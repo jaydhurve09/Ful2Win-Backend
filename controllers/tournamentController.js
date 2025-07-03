@@ -398,7 +398,7 @@ const registerPlayer = async (req, res) => {
 
 
     //add tournament to user's registered tournaments
-    user.tournaments.push(tournamentId);
+    //user.tournaments.push(tournamentId);
     // Deduct entry fee
 
     user.balance -= tournament.entryFee;
@@ -407,7 +407,15 @@ const registerPlayer = async (req, res) => {
     tournament.currentPlayers.push(playerId);
 
     // Save both
-    await Promise.all([user.save(), tournament.save()]);
+    user.balance -= tournament.entryFee;
+await user.save();
+
+// Update only necessary tournament fields — avoid saving bannerImage
+await Tournament.findByIdAndUpdate(tournamentId, {
+  $inc: { CollectPrize: tournament.entryFee },
+  $push: { currentPlayers: playerId }
+});
+
 
     return res.json({
       success: true,

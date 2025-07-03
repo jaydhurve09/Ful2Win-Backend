@@ -22,7 +22,7 @@ import referralRoutes from './routes/referralRoutes.js';
 // import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-import Gamerouter from './routes/gameRoute.js';
+import Scorerouter from './routes/ScoreRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
 // Handle uncaught exceptions
@@ -332,7 +332,7 @@ app.use('/api/referrals', referralRoutes);
 // app.use('/api/webhooks', webhookRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/game', Gamerouter);
+app.use('/api/score', Scorerouter);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/follow', followRoutes);
 
