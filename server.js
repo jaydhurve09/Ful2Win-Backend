@@ -435,7 +435,7 @@ const startServer = async () => {
 
     // Start the server
     console.log('🟢 [startServer] About to call app.listen...');
-    const PORT = process.env.PORT || 5000;
+    const PORT =5000;
     console.log(`🔵 [startServer] Using port: ${PORT}`);
 
     const server = app.listen(PORT, '0.0.0.0', () => {
