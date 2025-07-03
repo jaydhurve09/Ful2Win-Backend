@@ -155,6 +155,9 @@ const registerUser = async (req, res) => {
     });
     console.log('JWT token generated and set in cookie');
     // Remove password from output
+     await session.commitTransaction();
+     session.endSession();
+
     newUser.password = undefined;
     console.log('Returning user data without password');
     res.status(201).json({
@@ -176,9 +179,7 @@ const registerUser = async (req, res) => {
     // }
 
     // // Commit the transaction
-    // await session.commitTransaction();
-    // session.endSession();
-
+    
     // // Return user data (excluding password)
     // res.status(201).json({
     //   success: true,
