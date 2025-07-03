@@ -3,7 +3,6 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
@@ -19,12 +18,12 @@ import tournamentRoutes from './routes/tournamentRoutes.js';
 import carRacingRoute from './routes/carRacingRoute.js';
 import walletRoutes from './routes/walletRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
-// import webhookRoutes from './routes/webhookRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
+
 // Handle uncaught exceptions
 console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
@@ -50,7 +49,6 @@ app.set('io', io);
 // Load environment variables
 try {
   if (process.env.NODE_ENV !== 'production') {
-    // In development, load from .env file
     const envPath = '.env';
     console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
 
@@ -61,7 +59,6 @@ try {
       console.log(`[Server] Successfully loaded environment from ${envPath}`);
     }
   } else {
-    // In production, we expect all variables to be in process.env
     console.log(`[Server] Production mode - Using environment variables from process.env`);
   }
 
@@ -115,10 +112,18 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Add FRONTEND_URL if it exists
-if (process.env.FRONTEND_URL || process.env.LOCAL) {
-  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '') || process.env.LOCAL.replace(/\/$/, '');
+if (process.env.FRONTEND_URL) {
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
   if (!allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
+  }
+}
+
+// Add LOCAL if it exists
+if (process.env.LOCAL) {
+  const localUrl = process.env.LOCAL.replace(/\/$/, '');
+  if (!allowedOrigins.includes(localUrl)) {
+    allowedOrigins.push(localUrl);
   }
 }
 
@@ -323,54 +328,6 @@ app.use(fileUpload({
   preserveExtension: 4 // Preserve file extension (up to 4 chars)
 }));
 
-// API Routes - organized by functionality
-app.use('/api/posts', postRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/tournaments', tournamentRoutes);
-app.use('/api/car-racing', carRacingRoute);
-app.use('/api/wallet', walletRoutes);
-app.use('/api/referrals', referralRoutes);
-// app.use('/api/webhooks', webhookRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/game', Gamerouter);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/follow', followRoutes);
-
-// Game routes - static files and game-specific endpoints
-app.use('/games', express.static(path.join(__dirname, 'games'), {
-  setHeaders: (res) => {
-    res.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache for static assets
-  }
-}));
-
-// Game route aliases
-app.use('/games/2d-car-racing', carRacingRoute);
-app.use('/games/2d%20Car%20Racing%20Updated', carRacingRoute);
-
-// Test endpoint for debugging
-app.get('/api/test', (req, res) => {
-  console.log('Test endpoint hit!');
-  res.status(200).json({ 
-    status: 'success', 
-    message: 'Test endpoint is working!',
-    timestamp: new Date().toISOString() 
-  });
-});
-
-// API Routes - This comes AFTER fileUpload middleware
-app.use('/api/posts', postRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/wallet', walletRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/follow', followRoutes);
-
-// Serve static game files
-app.use('/games', express.static(path.join(__dirname, 'games')));
-
 // Health check endpoint (moved up before other routes)
 app.get('/health', (req, res) => {
   res.status(200).json({ 
@@ -389,6 +346,40 @@ app.get('/', (req, res) => {
     version: process.env.npm_package_version || '1.0.0'
   });
 });
+
+// Test endpoint for debugging
+app.get('/api/test', (req, res) => {
+  console.log('Test endpoint hit!');
+  res.status(200).json({ 
+    status: 'success', 
+    message: 'Test endpoint is working!',
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// API Routes - Register each route only once
+app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/game', Gamerouter);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/follow', followRoutes);
+
+// Game routes - static files and game-specific endpoints
+app.use('/games', express.static(path.join(__dirname, 'games'), {
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache for static assets
+  }
+}));
+
+// Game route aliases
+app.use('/games/2d-car-racing', carRacingRoute);
+app.use('/games/2d%20Car%20Racing%20Updated', carRacingRoute);
 
 // 404 handler
 app.use((req, res) => {
@@ -433,13 +424,13 @@ const startServer = async () => {
       console.log('⚠️ Server will start without Cloudinary. Some features may not work.');
     }
 
-    // Start the server
-    console.log('🟢 [startServer] About to call app.listen...');
-    const PORT =5000;
+    // Start the server using the existing server instance
+    console.log('🟢 [startServer] About to start server...');
+    const PORT = process.env.PORT || 5000;
     console.log(`🔵 [startServer] Using port: ${PORT}`);
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
       console.log('✅ Socket.IO server is running');
       console.log(`🌐 API: http://localhost:${PORT}/api`);
       console.log(`📝 API Documentation: http://localhost:${PORT}/api-docs`);
@@ -490,8 +481,7 @@ const startServer = async () => {
 // Export the app and startServer function
 export { app, startServer };
 
-// For backward compatibility
-//export default { app, startServer };
+// Start server if this file is run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   startServer();
 }
