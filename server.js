@@ -25,7 +25,6 @@ import authRoutes from './routes/authRoutes.js';
 import Gamerouter from './routes/gameRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
-dotenv.config();                    // loads from .env by default
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
