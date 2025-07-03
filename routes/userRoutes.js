@@ -198,6 +198,13 @@ router.get('/:userId/posts', protect, getUserPosts);
 // Get user profile picture
 router.get('/profile-picture/:userId', getProfilePicture);
 
+/**
+ * @route   GET /api/users/community
+ * @desc    Get all users (authenticated)
+ * @access  Private
+ */
+router.get('/community', getUsers);
+
 // Admin routes
 router.use(admin);
 
