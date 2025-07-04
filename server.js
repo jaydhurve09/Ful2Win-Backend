@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-dotenv.config();
 import schedule from 'node-schedule';
 import express from 'express';
 import cors from 'cors';
@@ -27,8 +26,6 @@ import followRoutes from './routes/followRoutes.js';
 
 dotenv.config();
 
-// Handle uncaught exceptions
-console.log('[DEBUG] Running server.js from:', import.meta.url);
 process.on('uncaughtException', (err) => {
   console.error(`UNCAUGHT EXCEPTION! 💥 Shutting down... ${err.name} ${err.message}`);
   process.exit(1);
@@ -53,7 +50,6 @@ app.set('io', io);
 try {
   if (process.env.NODE_ENV !== 'production') {
     const envPath = '.env';
-    console.log(`[Server] Development mode - Loading environment from: ${envPath}`);
 
     const result = dotenv.config({ path: envPath });
     if (result.error) {
@@ -83,18 +79,16 @@ try {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
   
-  console.log('[Server] All required environment variables are set');
-
   // Log the Cloudinary config (masking sensitive values)
-  if (process.env.CLOUDINARY_CLOUD_NAME) {
-    console.log('[Server] Cloudinary Config:', {
-      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
-      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'Not set',
-      CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'Not set'
-    });
-  } else {
-    console.warn('[Server] Cloudinary environment variables not found');
-  }
+  // if (process.env.CLOUDINARY_CLOUD_NAME) {
+  //   console.log('[Server] Cloudinary Config:', {
+  //     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+  //     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'Not set',
+  //     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'Not set'
+  //   });
+  // } else {
+  //   console.warn('[Server] Cloudinary environment variables not found');
+  // }
 } catch (error) {
   console.error(`[Server] Error during initialization: ${error.message}`);
   process.exit(1);
@@ -278,37 +272,37 @@ const requestLogger = (req, res, next) => {
   // Override response methods to log the response
   res.json = function(body) {
     const responseTime = Date.now() - startTime;
-    console.log('\n' + '-'.repeat(40));
-    console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
-    console.log('Status:', res.statusCode);
+    // console.log('\n' + '-'.repeat(40));
+    // console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
+    // console.log('Status:', res.statusCode);
     
     // Log response body (truncate if too large)
-    const responseStr = JSON.stringify(body, null, 2);
-    if (responseStr.length > 1000) {
-      console.log('Response:', responseStr.substring(0, 1000) + '... [TRUNCATED]');
-    } else {
-      console.log('Response:', responseStr);
-    }
+    // const responseStr = JSON.stringify(body, null, 2);
+    // if (responseStr.length > 1000) {
+    //   console.log('Response:', responseStr.substring(0, 1000) + '... [TRUNCATED]');
+    // } else {
+    //   console.log('Response:', responseStr);
+    // }
     
-    console.log('='.repeat(80) + '\n');
+    // console.log('='.repeat(80) + '\n');
     return originalJson.call(this, body);
   };
   
   res.send = function(body) {
     const responseTime = Date.now() - startTime;
-    console.log('\n' + '-'.repeat(40));
-    console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
-    console.log('Status:', res.statusCode);
+    // console.log('\n' + '-'.repeat(40));
+    // console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
+    // console.log('Status:', res.statusCode);
     
     // Log response body (truncate if too large)
-    const responseStr = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-    if (responseStr && responseStr.length > 1000) {
-      console.log('Response:', responseStr.substring(0, 1000) + '... [TRUNCATED]');
-    } else if (responseStr) {
-      console.log('Response:', responseStr);
-    }
+    // const responseStr = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+    // if (responseStr && responseStr.length > 1000) {
+    //   console.log('Response:', responseStr.substring(0, 1000) + '... [TRUNCATED]');
+    // } else if (responseStr) {
+    //   console.log('Response:', responseStr);
+    // }
     
-    console.log('='.repeat(80) + '\n');
+    // console.log('='.repeat(80) + '\n');
     return originalSend.call(this, body);
   };
   
