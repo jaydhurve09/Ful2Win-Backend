@@ -1,5 +1,4 @@
-import dotenv from 'dotenv/index.js';
-dotenv.config();
+import dotenv from 'dotenv';
 import schedule from 'node-schedule';
 import express from 'express';
 import cors from 'cors';
