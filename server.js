@@ -52,7 +52,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
-  'https://fulboost.fun'
+  'https://fulboost.fun',
+  'https://www.fulboost.fun',
 ];
 
 if (process.env.FRONTEND_URL) {
