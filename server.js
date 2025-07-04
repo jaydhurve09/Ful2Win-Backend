@@ -1,13 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import schedule from 'node-schedule';
-
-// Log all request headers for debugging
-app.use((req, res, next) => {
-  console.log(`➡️  [${req.method}] ${req.protocol}://${req.get('host')}${req.originalUrl}`);
-  console.log('🔎 All Headers:', JSON.stringify(req.headers, null, 2));
-  next();
-});
 import express from 'express';
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
@@ -44,6 +37,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Log all request headers for debugging
+app.use((req, res, next) => {
+  console.log(`➡️  [${req.method}] ${req.protocol}://${req.get('host')}${req.originalUrl}`);
+  console.log('🔎 All Headers:', JSON.stringify(req.headers, null, 2));
+  next();
+});
 const server = createServer(app);
 const io = initSocket(server);
 
