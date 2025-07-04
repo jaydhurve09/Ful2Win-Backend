@@ -40,12 +40,11 @@ const server = createServer(app);
 const io = initSocket(server);
 
 app.set('io', io);
-
 app.set('trust proxy', 1);
 
-// =======================================
+// ================================
 // ✅ CORS CONFIGURATION
-// =======================================
+// ================================
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -53,7 +52,7 @@ const allowedOrigins = [
   'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
   'https://fulboost.fun',
-  'https://www.fulboost.fun',
+  'https://www.fulboost.fun'
 ];
 
 if (process.env.FRONTEND_URL) {
@@ -63,10 +62,13 @@ if (process.env.LOCAL) {
   allowedOrigins.push(process.env.LOCAL.replace(/\/$/, ''));
 }
 
+console.log('✅ Allowed CORS Origins:', allowedOrigins);
+
 const corsOptions = {
   origin: (origin, callback) => {
     console.log('🌐 Checking CORS origin:', origin);
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // allow server-to-server, Postman etc.
+
     const normalized = origin.replace(/\/$/, '');
     if (allowedOrigins.includes(normalized)) {
       console.log(`✅ CORS allowed: ${normalized}`);
@@ -85,9 +87,9 @@ app.use((req, res, next) => {
 });
 app.options('*', cors(corsOptions));
 
-// =======================================
+// ================================
 // ✅ MIDDLEWARES
-// =======================================
+// ================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -100,9 +102,9 @@ app.use(fileUpload({
   preserveExtension: 4
 }));
 
-// =======================================
+// ================================
 // ✅ API ROUTES
-// =======================================
+// ================================
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
@@ -116,16 +118,16 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/follow', followRoutes);
 app.use('/api/messages', messageRoutes);
 
-// =======================================
-// ✅ STATIC FILES (Games)
-// =======================================
+// ================================
+// ✅ STATIC FILES
+// ================================
 app.use('/games', express.static(path.join(__dirname, 'games'), {
   setHeaders: res => res.set('Cache-Control', 'public, max-age=31536000')
 }));
 
-// =======================================
+// ================================
 // ✅ HEALTH + ROOT
-// =======================================
+// ================================
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.get('/', (req, res) => res.json({
   message: 'Welcome to Ful2Win Backend API',
@@ -133,18 +135,26 @@ app.get('/', (req, res) => res.json({
   timestamp: new Date().toISOString()
 }));
 
-// =======================================
+// ================================
 // ✅ ERROR HANDLING
-// =======================================
-app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl }));
+// ================================
+app.use((req, res) => res.status(404).json({
+  success: false,
+  message: 'Route not found',
+  path: req.originalUrl
+}));
 app.use((err, req, res, next) => {
   console.error('🔥 Global error:', err);
-  res.status(500).json({ success: false, message: 'Internal Server Error', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
+  res.status(500).json({
+    success: false,
+    message: 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { error: err.message })
+  });
 });
 
-// =======================================
+// ================================
 // ✅ START SERVER
-// =======================================
+// ================================
 const startServer = async () => {
   try {
     console.log('🔵 Connecting to MongoDB...');
