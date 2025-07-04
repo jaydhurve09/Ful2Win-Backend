@@ -65,6 +65,12 @@ if (process.env.LOCAL) {
 
 console.log('✅ Allowed CORS Origins:', allowedOrigins);
 
+// Log environment variables relevant to CORS and deployment
+console.log('🛠️ NODE_ENV:', process.env.NODE_ENV);
+console.log('🛠️ FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('🛠️ LOCAL:', process.env.LOCAL);
+console.log('🛠️ PORT:', process.env.PORT);
+
 const corsOptions = {
   allowedHeaders: [
     'Accept',
@@ -98,7 +104,12 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 };
 
+// Log every incoming request for debugging
 app.use((req, res, next) => {
+  const protocol = req.protocol;
+  const host = req.get('host');
+  const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+  console.log(`➡️  [${req.method}] ${fullUrl} - Origin: ${req.headers.origin}`);
   if (req.originalUrl.startsWith('/api/webhooks')) return next();
   return cors(corsOptions)(req, res, next);
 });
@@ -184,7 +195,11 @@ const startServer = async () => {
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, '0.0.0.0', () => {
+      console.log('========================================');
       console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'production'} mode`);
+      console.log('🌍 API Base URL:', `http://localhost:${PORT}/`);
+      console.log('✅ Allowed CORS Origins:', allowedOrigins);
+      console.log('========================================');
     });
 
     process.on('unhandledRejection', (err) => {
