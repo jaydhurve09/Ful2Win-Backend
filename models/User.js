@@ -139,6 +139,15 @@ const userSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  coinHistory: [
+    {
+      amount: { type: Number, required: true },
+      type: { type: String, default: 'spin' },
+      description: { type: String },
+      date: { type: Date, default: Date.now },
+      reference: { type: String }
+    }
+  ],
   resetPasswordToken: {
     type: String,
     select: false
