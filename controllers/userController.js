@@ -81,8 +81,6 @@ const registerUser = async (req, res) => {
   session.startTransaction();
 
   try {
-    console.log('=== Register User Request ===');
-    console.log('Request body:', req.body);
     
     const { fullName, phoneNumber, password,email, referralCode } = req.body;
 
@@ -206,13 +204,6 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-  //  console.log('\n=== Login Request ===');
-  //  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-    
-    // Log request headers and body for debugging
-  //  console.log('Headers:', req.headers);
-  //  console.log('Raw body:', req.body);
-    
     let requestBody = req.body;
     
     // If body is a string, try to parse it as JSON
@@ -390,8 +381,6 @@ if (!cloudinary.config().cloud_name) {
     api_secret: process.env.CLOUDINARY_API_SECRET,
     secure: true
   });
-  
-  console.log('Cloudinary configured with cloud name:', process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'missing');
 }
 
 // @desc    Update user profile
