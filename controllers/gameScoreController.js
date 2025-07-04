@@ -17,20 +17,7 @@ import Tournament from "../models/Tournament.js";
       return res.status(404).json({ message: "Tournament not found" });
     }
 
-    if (!tournament.currentPlayers.includes(userId)) {
-      if (
-        (tournament.status === 'upcoming' || tournament.status === 'live') &&
-        tournament.currentPlayers.length < tournament.maxPlayers
-      ) {
-        await Tournament.updateOne(
-          { _id: roomId },
-          { $addToSet: { currentPlayers: userId } }
-        );
-        console.log(`Auto-registered user ${userId} to tournament ${roomId}`);
-      } else {
-        return res.status(400).json({ message: "Cannot auto-register: Tournament is either completed or full." });
-      }
-    }
+   
 
     // Step 2: Check if the user already submitted a score
     const existingScore = await scoreModel.findOne({ userId, roomId, gameName });
