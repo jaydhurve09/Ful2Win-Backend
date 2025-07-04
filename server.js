@@ -84,22 +84,11 @@ const corsOptions = {
     'Authorization',
     'Origin',
     'X-Requested-With',
-    // Add any other custom headers here
+    'login',
+    'expires'
   ],
-  origin: (origin, callback) => {
-    console.log('🌐 Checking CORS origin:', origin);
-    console.log('✅ Allowed Origins:', allowedOrigins);
-    if (!origin) return callback(null, true); // allow server-to-server, Postman etc.
 
-    const normalized = origin.replace(/\/$/, '');
-    console.log('🔎 Normalized Origin:', normalized);
-    if (allowedOrigins.includes(normalized)) {
-      console.log(`✅ CORS allowed: ${normalized}`);
-      return callback(null, true);
-    }
-    console.log(`🚫 CORS blocked: ${normalized}`);
-    return callback(new Error('Not allowed by CORS'));
-  },
+  origin: 'https://fulboost.fun',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 };
@@ -197,7 +186,7 @@ const startServer = async () => {
     server.listen(PORT, '0.0.0.0', () => {
       console.log('========================================');
       console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'production'} mode`);
-      console.log('🌍 API Base URL:', `http://localhost:${PORT}/`);
+      console.log('🌍 API Base URL:', `https://api.fulboost.fun`);
       console.log('✅ Allowed CORS Origins:', allowedOrigins);
       console.log('========================================');
     });
