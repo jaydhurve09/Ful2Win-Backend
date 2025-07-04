@@ -105,7 +105,7 @@ const allowedOrigins = [
   'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
   'https://fulboost.fun',
-  'https://fulboost.fun/',
+  'https://fulboost.fun/login',
   'https://api.ful2win.com'
 ].filter(Boolean);
 
