@@ -407,6 +407,7 @@ const registerPlayer = async (req, res) => {
     tournament.currentPlayers.push(playerId);
 
     // Save both
+    user.tournaments.push(tournamentId);
     user.balance -= tournament.entryFee;
 await user.save();
 

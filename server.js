@@ -1,4 +1,4 @@
-import dotenv from 'dotenv/index.js';
+import dotenv from 'dotenv';
 dotenv.config();
 import schedule from 'node-schedule';
 import express from 'express';
