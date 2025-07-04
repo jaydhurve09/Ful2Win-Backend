@@ -78,7 +78,7 @@ try {
   if (missingVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
-  
+
   // Log the Cloudinary config (masking sensitive values)
   // if (process.env.CLOUDINARY_CLOUD_NAME) {
   //   console.log('[Server] Cloudinary Config:', {
@@ -124,49 +124,36 @@ if (process.env.LOCAL) {
     allowedOrigins.push(localUrl);
   }
 }
-
-// CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests, or server-side requests)
+    console.log('⚙️ Checking CORS origin:', origin);
+    
+    // Allow requests with no origin (mobile apps, curl, server-side)
     if (!origin) return callback(null, true);
     
-    // Normalize the origin by removing trailing slash for consistent comparison
-    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-    
-    // Check if the normalized origin is in the allowed origins
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
-      return normalizedOrigin === normalizedAllowed;
-    });
-    
-    if (!isAllowed) {
-      return callback(new Error('Not allowed by CORS'), false);
+    // Strip trailing slash
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    const isAllowed = allowedOrigins.includes(normalizedOrigin);
+
+    if (isAllowed) {
+      console.log(`✅ Allowed CORS origin: ${normalizedOrigin}`);
+      return callback(null, true);
+    } else {
+      console.log(`❌ Blocked by CORS: ${normalizedOrigin}`);
+      return callback(new Error('Not allowed by CORS'));
     }
-    
-    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Cache-Control',
-    'Pragma',
-    'Expires',
-    'Access-Control-Allow-Headers',
-    'Access-Control-Allow-Credentials'
+    'Content-Type', 'Authorization', 'X-Requested-With',
+    'Accept', 'Cache-Control', 'Pragma', 'Expires',
+    'Access-Control-Allow-Headers', 'Access-Control-Allow-Credentials'
   ],
-  exposedHeaders: [
-    'Content-Length',
-    'Authorization'
-  ],
-  maxAge: 86400, // 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  exposedHeaders: ['Content-Length', 'Authorization'],
+  maxAge: 86400,
 };
+
 
 // Apply CORS to all routes except webhooks
 app.use((req, res, next) => {
@@ -181,14 +168,14 @@ app.use((req, res, next) => {
 app.options('*', cors(corsOptions));
 
 // Body parsing middleware - must come before any route that needs to read the body
-app.use(express.json({ 
+app.use(express.json({
   limit: '50mb',
   strict: false, // Allow any JSON value
   type: ['application/json', 'application/*+json', 'text/plain'] // Handle various content types
 }));
 
-app.use(express.urlencoded({ 
-  extended: true, 
+app.use(express.urlencoded({
+  extended: true,
   limit: '50mb',
   type: ['application/x-www-form-urlencoded'],
   parameterLimit: 10000 // Increase parameter limit for large forms
@@ -236,46 +223,46 @@ const requestLogger = (req, res, next) => {
   const startTime = Date.now();
   const requestId = req.requestId || Math.random().toString(36).substring(2, 8);
   req.requestId = requestId;
-  
+
   // Log request details
   console.log('\n' + '='.repeat(80));
   console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl}`);
-  
+
   // Log request headers (redact sensitive info)
   const headers = { ...req.headers };
   ['authorization', 'cookie', 'x-access-token'].forEach(header => {
     if (headers[header]) headers[header] = '***REDACTED***';
   });
-  
+
   // console.log('Headers:', JSON.stringify(headers, null, 2));
-  
+
   // Log query parameters
   if (Object.keys(req.query).length > 0) {
     console.log('Query:', JSON.stringify(req.query, null, 2));
   }
-  
+
   // Log request body for non-GET requests
   // if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
   //   if (req.body && Object.keys(req.body).length > 0) {
   //     console.log('Body:', JSON.stringify(req.body, null, 2));
   //   }
-    
+
   //   if (req.files && Object.keys(req.files).length > 0) {
   //     console.log('Files:', Object.keys(req.files).join(', '));
   //   }
   // }
-  
+
   // Store original response methods
   const originalJson = res.json;
   const originalSend = res.send;
-  
+
   // Override response methods to log the response
-  res.json = function(body) {
+  res.json = function (body) {
     const responseTime = Date.now() - startTime;
     // console.log('\n' + '-'.repeat(40));
     // console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
     // console.log('Status:', res.statusCode);
-    
+
     // Log response body (truncate if too large)
     // const responseStr = JSON.stringify(body, null, 2);
     // if (responseStr.length > 1000) {
@@ -283,17 +270,17 @@ const requestLogger = (req, res, next) => {
     // } else {
     //   console.log('Response:', responseStr);
     // }
-    
+
     // console.log('='.repeat(80) + '\n');
     return originalJson.call(this, body);
   };
-  
-  res.send = function(body) {
+
+  res.send = function (body) {
     const responseTime = Date.now() - startTime;
     // console.log('\n' + '-'.repeat(40));
     // console.log(`[${new Date().toISOString()}] [${requestId}] Response (${responseTime}ms)`);
     // console.log('Status:', res.statusCode);
-    
+
     // Log response body (truncate if too large)
     // const responseStr = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
     // if (responseStr && responseStr.length > 1000) {
@@ -301,11 +288,11 @@ const requestLogger = (req, res, next) => {
     // } else if (responseStr) {
     //   console.log('Response:', responseStr);
     // }
-    
+
     // console.log('='.repeat(80) + '\n');
     return originalSend.call(this, body);
   };
-  
+
   next();
 };
 
@@ -317,7 +304,7 @@ app.use(fileUpload({
   useTempFiles: true,
   tempFileDir: path.join(__dirname, 'tmp'),
   createParentPath: true,
-  limits: { 
+  limits: {
     fileSize: 50 * 1024 * 1024, // 50MB max file size
     files: 5, // Maximum number of files
     abortOnLimit: true // Return 413 if file is too large
@@ -355,10 +342,10 @@ app.use('/games/2d%20Car%20Racing%20Updated', carRacingRoute);
 // Test endpoint for debugging
 app.get('/api/test', (req, res) => {
   console.log('Test endpoint hit!');
-  res.status(200).json({ 
-    status: 'success', 
+  res.status(200).json({
+    status: 'success',
     message: 'Test endpoint is working!',
-    timestamp: new Date().toISOString() 
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -377,15 +364,15 @@ app.use('/games', express.static(path.join(__dirname, 'games')));
 
 // Health check endpoint (moved up before other routes)
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString() 
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString()
   });
 });
 
 // Single root route
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Welcome to Ful2Win Backend API',
     status: 'running',
     timestamp: new Date().toISOString(),
