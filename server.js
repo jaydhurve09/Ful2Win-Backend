@@ -1,4 +1,4 @@
-import dotenv from 'dotenv/index.js';
+import dotenv from 'dotenv';
 dotenv.config();
 import schedule from 'node-schedule';
 import express from 'express';
@@ -110,7 +110,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
-  'https://www.ful2win.com',
+  'https://fulboost.fun',
+  'https://fulboost.fun/',
   'https://api.ful2win.com'
 ].filter(Boolean);
 
