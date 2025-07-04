@@ -184,7 +184,7 @@ const getWalletBalance = async (req, res) => {
   }
 };
 
-// @desc    Update wallet balance from spin wheel reward
+// @desc    Update user coins from spin wheel reward
 // @route   POST /api/wallet/spin-reward
 // @access  Private
 const updateSpinReward = async (req, res) => {
@@ -199,35 +199,35 @@ const updateSpinReward = async (req, res) => {
       });
     }
 
-    // Find user's wallet or create if it doesn't exist
-    let wallet = await Wallet.findOne({ user: userId });
-    
-    if (!wallet) {
-      wallet = new Wallet({
-        user: userId,
-        balance: 0,
-        transactions: []
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
       });
     }
 
-    // Update balance
-    wallet.balance += amount;
-    
-    // Add transaction record
-    wallet.transactions.push({
-      amount,
-      type: 'credit',
-      description: `Spin wheel reward: ${amount} coins`,
-      reference: `spin_${Date.now()}`,
-      status: 'completed'
-    });
+    // Update coins
+    user.coins = (user.coins || 0) + Number(amount);
 
-    await wallet.save();
+    // Optionally, add to coin transaction history if the field exists
+    if (Array.isArray(user.coinHistory)) {
+      user.coinHistory.push({
+        amount: Number(amount),
+        type: 'spin',
+        description: `Spin wheel reward: ${amount} coins`,
+        date: new Date(),
+        reference: `spin_${Date.now()}`
+      });
+    }
+
+    await user.save();
 
     res.status(200).json({
       success: true,
-      balance: wallet.balance,
-      message: `Successfully added ${amount} coins to your wallet`
+      coins: user.coins,
+      message: `Successfully added ${amount} coins to your account`
     });
   } catch (error) {
     console.error('Error updating spin reward:', error);
