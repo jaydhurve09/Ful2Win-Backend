@@ -65,11 +65,27 @@ if (process.env.LOCAL) {
 console.log('✅ Allowed CORS Origins:', allowedOrigins);
 
 const corsOptions = {
+  allowedHeaders: [
+    'Accept',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'DNT',
+    'Referer',
+    'User-Agent',
+    'Content-Type',
+    'Authorization',
+    'Origin',
+    'X-Requested-With',
+    // Add any other custom headers here
+  ],
   origin: (origin, callback) => {
     console.log('🌐 Checking CORS origin:', origin);
+    console.log('✅ Allowed Origins:', allowedOrigins);
     if (!origin) return callback(null, true); // allow server-to-server, Postman etc.
 
     const normalized = origin.replace(/\/$/, '');
+    console.log('🔎 Normalized Origin:', normalized);
     if (allowedOrigins.includes(normalized)) {
       console.log(`✅ CORS allowed: ${normalized}`);
       return callback(null, true);
@@ -167,7 +183,7 @@ const startServer = async () => {
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+      console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'production'} mode`);
     });
 
     process.on('unhandledRejection', (err) => {
