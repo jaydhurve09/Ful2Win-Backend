@@ -397,17 +397,17 @@ const registerPlayer = async (req, res) => {
     }
 
 
-    //add tournament to user's registered tournaments
-    //user.tournaments.push(tournamentId);
-    // Deduct entry fee
-
-    user.balance -= tournament.entryFee;
     //add entry fee to tournament prize pool
     tournament.CollectPrize += tournament.entryFee;
     tournament.currentPlayers.push(playerId);
-
+const type = tournament.tournamentType;
+    if (type === 'coin') {
+      user.coins -= tournament.entryFee;
+    }else if (type === 'cash') {
+      user.balance -= tournament.entryFee;
+    }
     // Save both
-    user.balance -= tournament.entryFee;
+    user.tournaments.push(tournamentId);
 await user.save();
 
 // Update only necessary tournament fields — avoid saving bannerImage
