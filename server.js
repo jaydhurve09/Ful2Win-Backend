@@ -56,10 +56,6 @@ const app = express();
 // ✅ CORS CONFIGURATION
 // ================================
 
-// Place CORS middleware at the very top
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
 // Log all request headers for debugging
 // NOTE: This logs every request header. Remove or comment out in production for performance and security.
 app.use((req, res, next) => {
@@ -122,8 +118,6 @@ const corsOptions = {
     'x-access-token', // Add any other custom headers you use
     'x-custom-header'
   ],
-  // ...other corsOptions properties (origin, credentials, etc.)
-  // Dynamically allow only the origins in allowedOrigins
   origin: function (origin, callback) {
     if (!origin) return callback(null, true); // Allow requests with no origin (e.g., mobile apps, curl)
     if (allowedOrigins.includes(origin)) {
@@ -135,6 +129,10 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 };
+
+// Place CORS middleware at the very top
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Log every incoming request for debugging
 app.use((req, res, next) => {
