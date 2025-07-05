@@ -95,19 +95,19 @@ console.log('🛠️ PORT:', process.env.PORT);
 const corsOptions = {
   allowedHeaders: [
     'Accept',
+    'Authorization',
     'Cache-Control',
-    'Pragma',
-    'Expires',
+    'Content-Type',
     'DNT',
+    'Expires',
+    'Origin',
+    'Pragma',
     'Referer',
     'User-Agent',
-    'Content-Type',
-    'Authorization',
-    'Origin',
+    'X-Razorpay-Signature',
     'X-Requested-With',
-    'login',
     'expires',
-    'X-Razorpay-Signature' // Added custom header used in webhooks
+    'login'
   ],
 
   // Dynamically allow only the origins in allowedOrigins
