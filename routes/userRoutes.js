@@ -12,7 +12,7 @@ import { createServer } from 'http';
 
 import { initSocket } from '../config/socket.js';
 import connectDB from '../config/db.js';
-import { connectCloudinary } from './config/cloudinary.js';
+import { connectCloudinary } from '../config/cloudinary.js';
 
 // Routes
 import messageRoutes from './routes/messageRoutes.js';
