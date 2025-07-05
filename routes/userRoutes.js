@@ -15,18 +15,18 @@ import connectDB from '../config/db.js';
 import { connectCloudinary } from '../config/cloudinary.js';
 
 // Routes
-import messageRoutes from './routes/messageRoutes.js';
-import postRoutes from './routes/postRoutes.js';
-import gameRoutes from './routes/gameRoutes.js';
-import tournamentRoutes from './routes/tournamentRoutes.js';
-import carRacingRoute from './routes/carRacingRoute.js';
-import walletRoutes from './routes/walletRoutes.js';
-import referralRoutes from './routes/referralRoutes.js';
-import userRoutes from './routes/userRoutes.js';
-import authRoutes from './routes/authRoutes.js';
-import Scorerouter from './routes/ScoreRoute.js';
-import notificationRoutes from './routes/notificationRoutes.js';
-import followRoutes from './routes/followRoutes.js';
+import messageRoutes from './messageRoutes.js';
+import postRoutes from './postRoutes.js';
+import gameRoutes from './gameRoutes.js';
+import tournamentRoutes from './tournamentRoutes.js';
+import carRacingRoute from './carRacingRoute.js';
+import walletRoutes from './walletRoutes.js';
+import referralRoutes from './referralRoutes.js';
+import userRoutes from './userRoutes.js';
+import authRoutes from './authRoutes.js';
+import Scorerouter from './ScoreRoute.js';
+import notificationRoutes from './notificationRoutes.js';
+import followRoutes from './followRoutes.js';
 
 process.on('uncaughtException', (err) => {
   console.error(`❌ Uncaught Exception: ${err.name}: ${err.message}`);
