@@ -501,6 +501,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Alias for legacy code compatibility
+userSchema.methods.comparePassword = userSchema.methods.matchPassword;
+
+
 // Generate referral code for new users
 userSchema.pre('save', async function(next) {
   if (this.isNew && !this.referralCode) {
