@@ -51,6 +51,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Place CORS middleware at the very top
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 // Log all request headers for debugging
 // NOTE: This logs every request header. Remove or comment out in production for performance and security.
 app.use((req, res, next) => {
@@ -134,7 +138,7 @@ app.use((req, res, next) => {
   const fullUrl = `${protocol}://${host}${req.originalUrl}`;
   console.log(`➡️  [${req.method}] ${fullUrl} - Origin: ${req.headers.origin}`);
   if (req.originalUrl.startsWith('/api/webhooks')) return next();
-  return cors(corsOptions)(req, res, next);
+  next();
 });
 app.options('*', cors(corsOptions));
 
