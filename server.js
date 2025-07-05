@@ -12,6 +12,19 @@ import { initSocket } from './config/socket.js';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
 
+// --- Security middleware suggestions (uncomment to enable in production) ---
+// import helmet from 'helmet';
+// import rateLimit from 'express-rate-limit';
+
+// --- Uncomment the following lines for enhanced security ---
+// app.use(helmet());
+// app.use(rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 100, // limit each IP to 100 requests per windowMs
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// }));
+
 // Routes
 import messageRoutes from './routes/messageRoutes.js';
 import postRoutes from './routes/postRoutes.js';
@@ -39,6 +52,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Log all request headers for debugging
+// NOTE: This logs every request header. Remove or comment out in production for performance and security.
 app.use((req, res, next) => {
   console.log(`➡️  [${req.method}] ${req.protocol}://${req.get('host')}${req.originalUrl}`);
   console.log('🔎 All Headers:', JSON.stringify(req.headers, null, 2));
@@ -92,10 +106,19 @@ const corsOptions = {
     'Origin',
     'X-Requested-With',
     'login',
-    'expires'
+    'expires',
+    'X-Razorpay-Signature' // Added custom header used in webhooks
   ],
 
-  origin: 'https://fulboost.fun',
+  // Dynamically allow only the origins in allowedOrigins
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // Allow requests with no origin (e.g., mobile apps, curl)
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'), false);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 };
