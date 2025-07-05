@@ -207,6 +207,9 @@ const registerUser = async (req, res) => {
 // @route   POST /api/users/login
 // @access  Public
 const loginUser = async (req, res) => {
+  // Debug: log the incoming request body and its type
+  console.log('LOGIN REQUEST BODY:', req.body, 'TYPE:', typeof req.body);
+
   try {
     // Accept both JSON and stringified JSON body
     let { phone, password } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -214,13 +217,21 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Phone and password are required' });
     }
     // Find user by phone number
-    const user = await User.findOne({ phoneNumber: phone }).select('+password');
+    let user;
+    try {
+      user = await User.findOne({ phoneNumber: phone }).select('+password');
+    } catch (dbErr) {
+      console.error('MongoDB connection or query error during login:', dbErr);
+      return res.status(500).json({ success: false, message: 'Database connection error', error: dbErr.message });
+    }
     if (!user) {
+      console.warn('Login failed: phone number not found:', phone);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
     // Compare password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.warn('Login failed: wrong password for phone:', phone);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
     // Generate JWT (assuming user.getSignedJwtToken() exists)
