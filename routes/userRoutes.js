@@ -17,13 +17,6 @@ import { protect, admin, testToken } from '../middleware/authMiddleware.js';
 import { uploadSingle } from '../middleware/uploadMiddleware.js';
 import User from '../models/User.js';
 
-process.on('uncaughtException', (err) => {
-  console.error(`❌ Uncaught Exception: ${err.name}: ${err.message}`);
-  process.exit(1);
-});
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
