@@ -100,16 +100,18 @@ const corsOptions = {
     'Cache-Control',
     'Content-Type',
     'DNT',
-    'Expires',
+    'Expires', // Capitalized
+    'expires', // Lowercase
     'Origin',
     'Pragma',
     'Referer',
     'User-Agent',
     'X-Razorpay-Signature',
     'X-Requested-With',
-    'expires',
     'login',
-    'blocked'
+    'blocked',
+    'x-access-token', // Add any other custom headers you use
+    'x-custom-header'
   ],
 
   // Dynamically allow only the origins in allowedOrigins
