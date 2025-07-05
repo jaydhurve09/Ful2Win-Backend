@@ -56,14 +56,15 @@ const server = createServer(app);
 // ✅ CORS CONFIGURATION
 // ================================
 const allowedOrigins = [
+  'https://fulboost.fun',
+  'https://fulboost.fun/login',
+  'https://www.fulboost.fun',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
   'https://ful2win.vercel.app',
-  'https://ful-2-win.vercel.app',
-  'https://fulboost.fun',
-  'https://fulboost.fun/login',
-  'https://www.fulboost.fun'
+  'https://ful-2-win.vercel.app'
+ 
 ];
 
 if (process.env.FRONTEND_URL) {
