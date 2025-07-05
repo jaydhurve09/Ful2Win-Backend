@@ -118,9 +118,6 @@ const corsOptions = {
     'x-custom-header'
   ],
   // ...other corsOptions properties (origin, credentials, etc.)
-};
-
-
   // Dynamically allow only the origins in allowedOrigins
   origin: function (origin, callback) {
     if (!origin) return callback(null, true); // Allow requests with no origin (e.g., mobile apps, curl)
