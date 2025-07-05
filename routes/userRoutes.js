@@ -22,7 +22,7 @@ import tournamentRoutes from './tournamentRoutes.js';
 import carRacingRoute from './carRacingRoute.js';
 import walletRoutes from './walletRoutes.js';
 import referralRoutes from './referralRoutes.js';
-import userRoutes from './userRoutes.js';
+
 import authRoutes from './authRoutes.js';
 import Scorerouter from './ScoreRoute.js';
 import notificationRoutes from './notificationRoutes.js';
@@ -122,7 +122,7 @@ app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/car-racing', carRacingRoute);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/referrals', referralRoutes);
-app.use('/api/users', userRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/score', Scorerouter);
 app.use('/api/notifications', notificationRoutes);
