@@ -1,32 +1,21 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import fileUpload from 'express-fileupload';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createServer } from 'http';
-
-import { initSocket } from '../config/socket.js';
-import connectDB from '../config/db.js';
-import { connectCloudinary } from '../config/cloudinary.js';
-
-// Routes
-import messageRoutes from './messageRoutes.js';
-import postRoutes from './postRoutes.js';
-import gameRoutes from './gameRoutes.js';
-import tournamentRoutes from './tournamentRoutes.js';
-import carRacingRoute from './carRacingRoute.js';
-import walletRoutes from './walletRoutes.js';
-import referralRoutes from './referralRoutes.js';
-
-import authRoutes from './authRoutes.js';
-import Scorerouter from './ScoreRoute.js';
-import notificationRoutes from './notificationRoutes.js';
-import followRoutes from './followRoutes.js';
+import {
+  registerUser,
+  loginUser,
+  logoutUser,
+  forgotPassword,
+  resetPassword,
+  checkUsername,
+  getUserProfile,
+  getCurrentUserProfile,
+  updateUserProfile,
+  getUsers,
+  getUserPosts,
+  getProfilePicture
+} from '../controllers/userController.js';
+import { protect, admin, testToken } from '../middleware/authMiddleware.js';
+import { uploadSingle } from '../middleware/uploadMiddleware.js';
+import User from '../models/User.js';
 
 process.on('uncaughtException', (err) => {
   console.error(`❌ Uncaught Exception: ${err.name}: ${err.message}`);
@@ -36,170 +25,134 @@ process.on('uncaughtException', (err) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const server = createServer(app);
-const io = initSocket(server);
-app.set('io', io);
-app.set('trust proxy', 1);
+const router = express.Router();
 
-// ================================
-// ✅ SECURITY + PERFORMANCE MIDDLEWARES
-// ================================
-if (process.env.NODE_ENV === 'production') {
-  app.use(helmet());
-  app.use(rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-  }));
-}
+// Public routes
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+router.post('/logout', logoutUser);
+router.get('/check-username/:username', checkUsername);
+router.get('/:userId/posts', getUserPosts);
 
-// ================================
-// ✅ CORS CONFIGURATION
-// ================================
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:5173',
-  'https://ful2win.vercel.app',
-  'https://ful-2-win.vercel.app',
-  'https://fulboost.fun',
-  'https://fulboost.fun/login',
-  'https://www.fulboost.fun'
-];
+// Password reset routes
+router.post('/forgot-password', forgotPassword);
+router.put('/reset-password/:token', resetPassword);
 
-if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
-if (process.env.LOCAL) allowedOrigins.push(process.env.LOCAL.replace(/\/$/, ''));
-
-console.log('✅ Allowed CORS Origins:', allowedOrigins);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Accept', 'Authorization', 'Cache-Control', 'Content-Type', 
-    'DNT', 'Expires', 'Origin', 'Pragma', 'Referer', 'User-Agent', 
-    'X-Razorpay-Signature', 'X-Requested-With', 'login', 'blocked',
-    'x-access-token', 'x-custom-header'
-  ]
-};
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
-// ================================
-// ✅ BODY & FILE PARSING
-// ================================
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(fileUpload({
-  useTempFiles: true,
-  tempFileDir: path.join(__dirname, 'tmp'),
-  limits: { fileSize: 50 * 1024 * 1024 },
-  safeFileNames: true,
-  preserveExtension: 4
-}));
-
-// ================================
-// ✅ SINGLE LOGGER MIDDLEWARE
-// ================================
-app.use((req, res, next) => {
-  console.log(`➡️  [${req.method}] ${req.protocol}://${req.get('host')}${req.originalUrl}`);
-  console.log('Origin:', req.headers.origin);
-  next();
-});
-
-// ================================
-// ✅ ROUTES
-// ================================
-app.use('/api/posts', postRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/tournaments', tournamentRoutes);
-app.use('/api/car-racing', carRacingRoute);
-app.use('/api/wallet', walletRoutes);
-app.use('/api/referrals', referralRoutes);
-
-app.use('/api/auth', authRoutes);
-app.use('/api/score', Scorerouter);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/follow', followRoutes);
-app.use('/api/messages', messageRoutes);
-
-// ================================
-// ✅ STATIC FILES
-// ================================
-app.use('/games', express.static(path.join(__dirname, 'games'), {
-  setHeaders: res => res.set('Cache-Control', 'public, max-age=31536000')
-}));
-
-// ================================
-// ✅ HEALTH + ROOT
-// ================================
-app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
-app.get('/', (req, res) => res.json({
-  message: 'Welcome to Ful2Win Backend API',
-  environment: process.env.NODE_ENV || 'development',
-  timestamp: new Date().toISOString()
-}));
-
-// ================================
-// ✅ ERROR HANDLING
-// ================================
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl });
-});
-app.use((err, req, res, next) => {
-  console.error('🔥 Global error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && { error: err.message })
+// Test endpoint to check request body parsing
+router.post('/test-body', (req, res) => {
+  res.json({
+    success: true,
+    headers: req.headers,
+    body: req.body,
+    bodyType: typeof req.body,
+    rawHeaders: req.rawHeaders
   });
 });
 
-// ================================
-// ✅ START SERVER
-// ================================
-const startServer = async () => {
+// Temporary route to check user existence (remove in production)
+router.get('/check-user/:phoneNumber', async (req, res) => {
   try {
-    console.log('🔵 Connecting to MongoDB...');
-    await connectDB();
-    console.log('✅ MongoDB connected');
-
-    console.log('🔵 Connecting to Cloudinary...');
-    await connectCloudinary();
-    console.log('✅ Cloudinary connected');
-
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log('========================================');
-      console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'production'} mode`);
-      console.log('🌍 API Base URL:', `https://api.fulboost.fun`);
-      console.log('✅ Allowed CORS Origins:', allowedOrigins);
-      console.log('========================================');
-    });
-
-    process.on('unhandledRejection', (err) => {
-      console.error('❌ Unhandled Rejection:', err);
-      server.close(() => process.exit(1));
-    });
-
-    process.on('SIGTERM', () => {
-      console.log('👋 SIGTERM received. Shutting down.');
-      server.close(() => process.exit(0));
-    });
-
-  } catch (err) {
-    console.error('❌ Startup error:', err);
-    process.exit(1);
+    const user = await User.findOne({ phoneNumber: req.params.phoneNumber });
+    if (user) {
+      res.json({
+        exists: true,
+        user: {
+          _id: user._id,
+          phoneNumber: user.phoneNumber,
+          fullName: user.fullName
+        }
+      });
+    } else {
+      res.json({ exists: false });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
   }
-};
+});
 
-if (import.meta.url === `file://${process.argv[1]}`) startServer();
+router.get('/test-token', testToken);
 
-export { app, startServer };
-export default { app, startServer };
+// Protected routes
+router.use(protect);
+router.get('/me', getCurrentUserProfile);
+router.get('/profile/:userId', getUserProfile);
+router.put(
+  '/profile/:userId',
+  (req, res, next) => {
+    uploadSingle('profilePicture')(req, res, function (err) {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({
+            success: false,
+            message: 'File too large. Maximum size is 5MB.'
+          });
+        } else if (err.code === 'INVALID_FILE_TYPE') {
+          return res.status(415).json({
+            success: false,
+            message: 'Invalid file type. Only images are allowed.'
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: 'Error uploading file',
+            error: err.message
+          });
+        }
+      }
+      next();
+    });
+  },
+  (req, res, next) => {
+    try {
+      if (req.body.data) {
+        try {
+          const parsedData = JSON.parse(req.body.data);
+          req.body = { ...req.body, ...parsedData };
+          delete req.body.data;
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid JSON data in form field',
+            error: e.message
+          });
+        }
+      }
+      next();
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error processing request',
+        error: error.message
+      });
+    }
+  },
+  updateUserProfile
+);
+router.get('/:userId/posts', protect, getUserPosts);
+router.get('/profile-picture/:userId', getProfilePicture);
+router.get('/community', getUsers);
+
+// Admin routes
+router.use(admin);
+router.get('/', getUsers);
+
+// Error handling middleware for user routes
+router.use((err, req, res, next) => {
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation Error',
+      errors: Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }))
+    });
+  }
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'An unexpected error occurred',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+export default router;
