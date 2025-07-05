@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 
 import { initSocket } from '../config/socket.js';
-import connectDB from './config/db.js';
+import connectDB from '../config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
 
 // Routes
