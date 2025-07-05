@@ -1,247 +1,205 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
-import { 
-  registerUser, 
-  loginUser,
-  logoutUser,
-  forgotPassword,
-  resetPassword,
-  checkUsername,
-  getUserProfile,
-  getCurrentUserProfile,
-  updateUserProfile,
-  getUsers,
-  getUserPosts,
-  getProfilePicture
-} from '../controllers/userController.js';
-import { protect, admin, testToken } from '../middleware/authMiddleware.js';
-import { uploadSingle, handleMulterError } from '../middleware/uploadMiddleware.js';
-import User from '../models/User.js';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import fileUpload from 'express-fileupload';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createServer } from 'http';
 
-const router = express.Router();
+import { initSocket } from './config/socket.js';
+import connectDB from './config/db.js';
+import { connectCloudinary } from './config/cloudinary.js';
 
-// Public routes
-router.post('/register', registerUser);
-router.post('/login', loginUser);
-router.post('/logout', logoutUser);
-router.get('/check-username/:username', checkUsername);
-router.get('/:userId/posts', getUserPosts);
+// Routes
+import messageRoutes from './routes/messageRoutes.js';
+import postRoutes from './routes/postRoutes.js';
+import gameRoutes from './routes/gameRoutes.js';
+import tournamentRoutes from './routes/tournamentRoutes.js';
+import carRacingRoute from './routes/carRacingRoute.js';
+import walletRoutes from './routes/walletRoutes.js';
+import referralRoutes from './routes/referralRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import Scorerouter from './routes/ScoreRoute.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import followRoutes from './routes/followRoutes.js';
 
-// Password reset routes
-router.post('/forgot-password', forgotPassword);
-router.put('/reset-password/:token', resetPassword);
-
-
-// Test endpoint to check request body parsing
-router.post('/test-body', (req, res) => {
-  console.log('=== Test Body Endpoint ===');
-  console.log('Headers:', req.headers);
-  console.log('Raw body:', req.body);
-  console.log('Body type:', typeof req.body);
-  
-  res.json({
-    success: true,
-    headers: req.headers,
-    body: req.body,
-    bodyType: typeof req.body,
-    rawHeaders: req.rawHeaders
-  });
+process.on('uncaughtException', (err) => {
+  console.error(`❌ Uncaught Exception: ${err.name}: ${err.message}`);
+  process.exit(1);
 });
 
-// Temporary route to check user existence (remove in production)
-router.get('/check-user/:phoneNumber', async (req, res) => {
-  try {
-    const user = await User.findOne({ phoneNumber: req.params.phoneNumber });
-    if (user) {
-      res.json({ 
-        exists: true, 
-        user: { 
-          _id: user._id, 
-          phoneNumber: user.phoneNumber,
-          fullName: user.fullName 
-        } 
-      });
-    } else {
-      res.json({ exists: false });
-    }
-  } catch (error) {
-    console.error('Error checking user:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const server = createServer(app);
+const io = initSocket(server);
+app.set('io', io);
+app.set('trust proxy', 1);
+
+// ================================
+// ✅ SECURITY + PERFORMANCE MIDDLEWARES
+// ================================
+if (process.env.NODE_ENV === 'production') {
+  app.use(helmet());
+  app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
+}
+
+// ================================
+// ✅ CORS CONFIGURATION
+// ================================
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
+  'https://ful2win.vercel.app',
+  'https://ful-2-win.vercel.app',
+  'https://fulboost.fun',
+  'https://fulboost.fun/login',
+  'https://www.fulboost.fun'
+];
+
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+if (process.env.LOCAL) allowedOrigins.push(process.env.LOCAL.replace(/\/$/, ''));
+
+console.log('✅ Allowed CORS Origins:', allowedOrigins);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Accept', 'Authorization', 'Cache-Control', 'Content-Type', 
+    'DNT', 'Expires', 'Origin', 'Pragma', 'Referer', 'User-Agent', 
+    'X-Razorpay-Signature', 'X-Requested-With', 'login', 'blocked',
+    'x-access-token', 'x-custom-header'
+  ]
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// ================================
+// ✅ BODY & FILE PARSING
+// ================================
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: path.join(__dirname, 'tmp'),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  safeFileNames: true,
+  preserveExtension: 4
+}));
+
+// ================================
+// ✅ SINGLE LOGGER MIDDLEWARE
+// ================================
+app.use((req, res, next) => {
+  console.log(`➡️  [${req.method}] ${req.protocol}://${req.get('host')}${req.originalUrl}`);
+  console.log('Origin:', req.headers.origin);
+  next();
 });
 
-/**
- * @route   GET /api/users/test-token
- * @desc    Test JWT token verification
- * @access  Public
- */
-router.get('/test-token', testToken);
+// ================================
+// ✅ ROUTES
+// ================================
+app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/score', Scorerouter);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/follow', followRoutes);
+app.use('/api/messages', messageRoutes);
 
-// Protected routes
-router.use(protect);
+// ================================
+// ✅ STATIC FILES
+// ================================
+app.use('/games', express.static(path.join(__dirname, 'games'), {
+  setHeaders: res => res.set('Cache-Control', 'public, max-age=31536000')
+}));
 
-/**
- * @route   GET /api/users/me
- * @desc    Get current user profile
- * @access  Private
- */
-router.get('/me', getCurrentUserProfile);
+// ================================
+// ✅ HEALTH + ROOT
+// ================================
+app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+app.get('/', (req, res) => res.json({
+  message: 'Welcome to Ful2Win Backend API',
+  environment: process.env.NODE_ENV || 'development',
+  timestamp: new Date().toISOString()
+}));
 
-/**
- * @route   GET /api/users/profile/:userId
- * @desc    Get user profile by ID
- * @access  Private
- */
-router.get('/profile/:userId', getUserProfile);
-
-/**
- * @route   PUT /api/users/profile/:userId
- * @desc    Update user profile
- * @access  Private
- */
-router.put(
-  '/profile/:userId', 
-  protect,
-  // Handle file upload with error handling
-  (req, res, next) => {
-    uploadSingle('profilePicture')(req, res, function(err) {
-      // Handle multer errors
-      if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(413).json({ 
-            success: false,
-            message: 'File too large. Maximum size is 5MB.'
-          });
-        } else if (err.code === 'INVALID_FILE_TYPE') {
-          return res.status(415).json({ 
-            success: false,
-            message: 'Invalid file type. Only images are allowed.'
-          });
-        } else if (err) {
-          console.error('File upload error:', err);
-          return res.status(400).json({ 
-            success: false,
-            message: 'Error uploading file',
-            error: err.message
-          });
-        }
-      }
-      next();
-    });
-  },
-  // Process the request
-  (req, res, next) => {
-    try {
-      // Log the incoming request
-      console.log('=== Profile Update Request ===', {
-        method: req.method,
-        url: req.originalUrl,
-        headers: {
-          'content-type': req.get('content-type'),
-          'content-length': req.get('content-length'),
-          'authorization': req.get('authorization') ? 'present' : 'missing'
-        },
-        body: Object.keys(req.body || {}),
-        files: req.files ? Object.keys(req.files) : 'no files',
-        file: req.file ? 'file present' : 'no file'
-      });
-      
-      // Handle JSON data if sent as form-data
-      if (req.body.data) {
-        try {
-          const parsedData = JSON.parse(req.body.data);
-          req.body = { ...req.body, ...parsedData };
-          delete req.body.data;
-        } catch (e) {
-          console.error('Error parsing JSON data:', e);
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid JSON data in form field',
-            error: e.message
-          });
-        }
-      }
-      
-      // Log file info if present
-      if (req.file) {
-        console.log('File uploaded successfully:', {
-          fieldname: req.file.fieldname,
-          originalname: req.file.originalname,
-          mimetype: req.file.mimetype,
-          size: req.file.size,
-          hasBuffer: !!req.file.buffer,
-          bufferLength: req.file.buffer?.length || 0
-        });
-      } else {
-        console.log('No file included in this request');
-      }
-      
-      next();
-    } catch (error) {
-      console.error('Error in profile update middleware:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Error processing request',
-        error: error.message
-      });
-    }
-  },
-  updateUserProfile
-);
-
-/**
- * @route   GET /api/users/:userId/posts
- * @desc    Get posts by user
- * @access  Private
- */
-router.get('/:userId/posts', protect, getUserPosts);
-
-// Get user profile picture
-router.get('/profile-picture/:userId', getProfilePicture);
-
-/**
- * @route   GET /api/users/community
- * @desc    Get all users (authenticated)
- * @access  Private
- */
-router.get('/community', getUsers);
-
-// Admin routes
-router.use(admin);
-
-/**
- * @route   GET /api/users
- * @desc    Get all users (admin only)
- * @access  Private/Admin
- */
-router.get('/', getUsers);
-
-// Error handling middleware for user routes
-router.use((err, req, res, next) => {
-  console.error('User route error:', {
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-    path: req.path,
-    method: req.method
-  });
-
-  // Handle specific error types
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation Error',
-      errors: Object.values(err.errors).map(e => ({
-        field: e.path,
-        message: e.message
-      }))
-    });
-  }
-
-  // Default error response
-  res.status(err.status || 500).json({
+// ================================
+// ✅ ERROR HANDLING
+// ================================
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl });
+});
+app.use((err, req, res, next) => {
+  console.error('🔥 Global error:', err);
+  res.status(500).json({
     success: false,
-    message: err.message || 'An unexpected error occurred',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { error: err.message })
   });
 });
 
-export default router;
+// ================================
+// ✅ START SERVER
+// ================================
+const startServer = async () => {
+  try {
+    console.log('🔵 Connecting to MongoDB...');
+    await connectDB();
+    console.log('✅ MongoDB connected');
+
+    console.log('🔵 Connecting to Cloudinary...');
+    await connectCloudinary();
+    console.log('✅ Cloudinary connected');
+
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log('========================================');
+      console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'production'} mode`);
+      console.log('🌍 API Base URL:', `https://api.fulboost.fun`);
+      console.log('✅ Allowed CORS Origins:', allowedOrigins);
+      console.log('========================================');
+    });
+
+    process.on('unhandledRejection', (err) => {
+      console.error('❌ Unhandled Rejection:', err);
+      server.close(() => process.exit(1));
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('👋 SIGTERM received. Shutting down.');
+      server.close(() => process.exit(0));
+    });
+
+  } catch (err) {
+    console.error('❌ Startup error:', err);
+    process.exit(1);
+  }
+};
+
+if (import.meta.url === `file://${process.argv[1]}`) startServer();
+
+export { app, startServer };
+export default { app, startServer };
