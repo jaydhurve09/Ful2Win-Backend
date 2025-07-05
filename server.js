@@ -117,6 +117,9 @@ const corsOptions = {
     'x-access-token', // Add any other custom headers you use
     'x-custom-header'
   ],
+  // ...other corsOptions properties (origin, credentials, etc.)
+};
+
 
   // Dynamically allow only the origins in allowedOrigins
   origin: function (origin, callback) {
