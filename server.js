@@ -51,6 +51,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+
 // Place CORS middleware at the very top
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
