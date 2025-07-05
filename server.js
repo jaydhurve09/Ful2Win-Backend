@@ -74,6 +74,7 @@ const allowedOrigins = [
   'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
   'https://fulboost.fun',
+  'https://fulboost.fun/login',
   'https://www.fulboost.fun'
 ];
 
@@ -107,7 +108,8 @@ const corsOptions = {
     'X-Razorpay-Signature',
     'X-Requested-With',
     'expires',
-    'login'
+    'login',
+    'blocked'
   ],
 
   // Dynamically allow only the origins in allowedOrigins
