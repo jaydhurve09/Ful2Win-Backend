@@ -55,26 +55,37 @@ const server = createServer(app);
 // ================================
 // ✅ CORS CONFIGURATION
 // ================================
-const allowedOrigins = [
+// Allowed origins for CORS
+const prodOrigins = [
   'https://fulboost.fun',
   'https://fulboost.fun/login',
   'https://www.fulboost.fun',
+  'https://ful2win.vercel.app',
+  'https://ful-2-win.vercel.app',
+];
+
+const devOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
-  'https://ful2win.vercel.app',
-  'https://ful-2-win.vercel.app'
- 
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
 ];
 
+// Add dynamic origins from environment variables if present
+// TEMPORARY: Allow localhost origins in production for debugging
+// REMOVE THIS after local debugging is complete!
+let allowedOrigins = [...prodOrigins, ...devOrigins];
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
 }
 if (process.env.LOCAL) {
   allowedOrigins.push(process.env.LOCAL.replace(/\/$/, ''));
 }
+// Remove duplicates
+const uniqueAllowedOrigins = [...new Set(allowedOrigins)];
 
-console.log('✅ Allowed CORS Origins:', allowedOrigins);
+console.log('✅ Allowed CORS Origins:', uniqueAllowedOrigins);
 
 // Log environment variables relevant to CORS and deployment
 console.log('🛠️ NODE_ENV:', process.env.NODE_ENV);
@@ -103,10 +114,18 @@ const corsOptions = {
     'x-custom-header'
   ],
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // Allow requests with no origin (e.g., mobile apps, curl)
-    if (allowedOrigins.includes(origin)) {
+    // Debug log for CORS origin processing
+    console.log(`[CORS] Incoming Origin: ${origin}`);
+    if (!origin) {
+      console.log('[CORS] No origin provided, allowing request (curl/mobile app)');
       return callback(null, true);
+    }
+    if (uniqueAllowedOrigins.includes(origin)) {
+      console.log(`[CORS] Origin allowed: ${origin}`);
+      return callback(null, origin); // Set header to requesting origin
     } else {
+      console.log(`[CORS] Origin NOT allowed: ${origin}`);
+      console.log(`[CORS] Allowed origins:`, uniqueAllowedOrigins);
       return callback(new Error('Not allowed by CORS'), false);
     }
   },
@@ -117,6 +136,12 @@ const corsOptions = {
 // Place CORS middleware at the very top
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
+// To enable local development, localhost origins are included below.
+// IMPORTANT: Remove localhost origins from uniqueAllowedOrigins before deploying to production for better security.
+// Example:
+// const uniqueAllowedOrigins = [...new Set(prodOrigins)];
+// (Uncomment above and remove devOrigins from allowedOrigins)
 
 // Log every incoming request for debugging
 app.use((req, res, next) => {
