@@ -214,7 +214,7 @@ const startServer = async () => {
     await connectCloudinary();
     console.log('✅ Cloudinary connected');
 
-    const PORT = process.env.PORT || 5000;
+    const PORT =  5000;
     server.listen(PORT, '0.0.0.0', () => {
       console.log('========================================');
       console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'production'} mode`);
