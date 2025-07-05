@@ -51,24 +51,6 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-
-// ================================
-// ✅ CORS CONFIGURATION
-// ================================
-
-// Log all request headers for debugging
-// NOTE: This logs every request header. Remove or comment out in production for performance and security.
-app.use((req, res, next) => {
-  console.log(`➡️  [${req.method}] ${req.protocol}://${req.get('host')}${req.originalUrl}`);
-  console.log('🔎 All Headers:', JSON.stringify(req.headers, null, 2));
-  next();
-});
-const server = createServer(app);
-const io = initSocket(server);
-
-app.set('io', io);
-app.set('trust proxy', 1);
-
 // ================================
 // ✅ CORS CONFIGURATION
 // ================================
