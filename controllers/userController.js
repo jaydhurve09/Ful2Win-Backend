@@ -92,7 +92,7 @@ const registerUser = async (req, res) => {
 
   try {
     
-    const { fullName, phoneNumber, password,email, referralCode } = req.body;
+    const { fullName, phone,phoneNumber, password,email, referralCode } = req.body;
 
     if (!fullName || !phoneNumber || !password|| !email) {
       console.log('Missing required fields');
