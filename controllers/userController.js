@@ -92,9 +92,9 @@ const registerUser = async (req, res) => {
 
   try {
     
-    const { fullName, phone,phoneNumber, password,email, referralCode } = req.body;
+    const { fullName, phoneNumber, password, email, referralCode } = req.body;
 
-    if (!fullName || !phoneNumber || !password|| !email) {
+    if (!fullName || !phoneNumber || !password || !email) {
       console.log('Missing required fields');
       return res.status(400).json({ 
         success: false,
@@ -104,13 +104,13 @@ const registerUser = async (req, res) => {
     }
 
     // Check if user already exists
-    console.log('Checking if user exists with phone:', phoneNumber);
+    console.log('Checking if user exists with phoneNumber:', phoneNumber);
     const userExists = await User.findOne({ phoneNumber }).session(session);
     if (userExists) {
-      console.log('User already exists with phone:', phoneNumber);
+      console.log('User already exists with phoneNumber:', phoneNumber);
       return res.status(400).json({ 
         success: false,
-        message: 'User already exists with this phone number' 
+        message: 'User already exists with this phoneNumber' 
       });
     }
 
@@ -212,26 +212,26 @@ const loginUser = async (req, res) => {
 
   try {
     // Accept both JSON and stringified JSON body
-    let { phone, password } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    if (!phone || !password) {
-      return res.status(400).json({ success: false, message: 'Phone and password are required' });
+    let { phoneNumber, password } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    if (!phoneNumber || !password) {
+      return res.status(400).json({ success: false, message: 'phoneNumber and password are required' });
     }
-    // Find user by phone number
+    // Find user by phoneNumber
     let user;
     try {
-      user = await User.findOne({ phoneNumber: phone }).select('+password');
+      user = await User.findOne({ phoneNumber: phoneNumber }).select('+password');
     } catch (dbErr) {
       console.error('MongoDB connection or query error during login:', dbErr);
       return res.status(500).json({ success: false, message: 'Database connection error', error: dbErr.message });
     }
     if (!user) {
-      console.warn('Login failed: phone number not found:', phone);
+      console.warn('Login failed: phoneNumber not found:', phoneNumber);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
     // Compare password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.warn('Login failed: wrong password for phone:', phone);
+      console.warn('Login failed: wrong password for phoneNumber:', phoneNumber);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
     // Generate JWT (assuming user.getSignedJwtToken() exists)
