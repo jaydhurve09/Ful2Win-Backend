@@ -212,14 +212,15 @@ const loginUser = async (req, res) => {
 
   try {
     // Accept both JSON and stringified JSON body
-    let { phoneNumber, password } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    if (!phoneNumber || !password) {
-      return res.status(400).json({ success: false, message: 'phoneNumber and password are required' });
+    let { phoneNumber, phone, password } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const loginPhoneNumber = phoneNumber || phone;
+    if (!loginPhoneNumber || !password) {
+      return res.status(400).json({ success: false, message: 'phoneNumber (or phone) and password are required' });
     }
-    // Find user by phoneNumber
+    // Find user by phoneNumber or phone
     let user;
     try {
-      user = await User.findOne({ phoneNumber: phoneNumber }).select('+password');
+      user = await User.findOne({ phoneNumber: loginPhoneNumber }).select('+password');
     } catch (dbErr) {
       console.error('MongoDB connection or query error during login:', dbErr);
       return res.status(500).json({ success: false, message: 'Database connection error', error: dbErr.message });
