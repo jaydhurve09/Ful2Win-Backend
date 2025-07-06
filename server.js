@@ -114,24 +114,27 @@ const corsOptions = {
     'x-custom-header'
   ],
   origin: function (origin, callback) {
-    // Debug log for CORS origin processing
     console.log(`[CORS] Incoming Origin: ${origin}`);
+  
     if (!origin) {
-      console.log('[CORS] No origin provided, allowing request (curl/mobile app)');
+      console.log('[CORS] No origin provided, allowing non-browser request (curl / server)');
       return callback(null, true);
     }
+  
     if (uniqueAllowedOrigins.includes(origin)) {
-      console.log(`[CORS] Origin allowed: ${origin}`);
-      return callback(null, origin); // Set header to requesting origin
+      console.log(`[CORS] ✅ Origin allowed: ${origin}`);
+      return callback(null, true); // Tell CORS to allow this origin
     } else {
-      console.log(`[CORS] Origin NOT allowed: ${origin}`);
+      console.log(`[CORS] 🚫 Origin NOT allowed: ${origin}`);
       console.log(`[CORS] Allowed origins:`, uniqueAllowedOrigins);
-      return callback(new Error('Not allowed by CORS'), false);
+      return callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
+  
 };
+
 
 // Place CORS middleware at the very top
 app.use(cors(corsOptions));
