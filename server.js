@@ -140,12 +140,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-// To enable local development, localhost origins are included below.
-// IMPORTANT: Remove localhost origins from uniqueAllowedOrigins before deploying to production for better security.
-// Example:
-// const uniqueAllowedOrigins = [...new Set(prodOrigins)];
-// (Uncomment above and remove devOrigins from allowedOrigins)
-
 // Log every incoming request for debugging
 app.use((req, res, next) => {
   const protocol = req.protocol;
@@ -155,11 +149,7 @@ app.use((req, res, next) => {
   if (req.originalUrl.startsWith('/api/webhooks')) return next();
   next();
 });
-app.options('*', cors(corsOptions));
 
-// ================================
-// ✅ MIDDLEWARES
-// ================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
