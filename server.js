@@ -51,6 +51,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = createServer(app);
+// Attach Socket.io to the HTTP server
+initSocket(server);
 
 // ================================
 // ✅ CORS CONFIGURATION
