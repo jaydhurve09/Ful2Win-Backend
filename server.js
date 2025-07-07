@@ -138,7 +138,6 @@ const corsOptions = {
 
 // Place CORS middleware at the very top
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 // Log every incoming request for debugging
 app.use((req, res, next) => {
