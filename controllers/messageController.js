@@ -1,4 +1,5 @@
 import Message from '../models/Message.js';
+import { getIO } from '../config/socket.js';
 
 // Send a message
 export const sendMessage = async (req, res) => {
@@ -11,6 +12,12 @@ export const sendMessage = async (req, res) => {
     }
 
     const message = await Message.create({ sender, recipient, content });
+
+    // Emit real-time event to both sender and recipient via Socket.io
+    const io = getIO();
+    io.to(sender.toString()).emit('new_message', message);
+    io.to(recipient.toString()).emit('new_message', message);
+
     res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ error: 'Failed to send message' });

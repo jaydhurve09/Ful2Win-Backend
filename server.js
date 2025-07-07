@@ -8,9 +8,11 @@ import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
-import { initSocket } from './config/socket.js';
+import { initSocket, getIO } from './config/socket.js';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
+import Message from './models/Message.js';
+import User from './models/User.js';
 
 // --- Security middleware suggestions (uncomment to enable in production) ---
 // import helmet from 'helmet';
@@ -50,9 +52,48 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Logging middleware to trace all incoming requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
 const server = createServer(app);
 // Attach Socket.io to the HTTP server
 initSocket(server);
+
+// Real-time chat socket events
+import jwt from 'jsonwebtoken';
+const io = getIO();
+io.on('connection', (socket) => {
+  // Join user room for personal messages
+  socket.on('join', (userId) => {
+    if (userId) {
+      socket.join(userId);
+    }
+  });
+
+  // Listen for chat message event
+  socket.on('chatMessage', async (data) => {
+    try {
+      const { token, recipient, content } = data;
+      if (!token || !recipient || !content) return;
+      // Verify token and get sender
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const sender = decoded.id;
+      if (!sender) return;
+      // Save message to DB
+      const message = await Message.create({ sender, recipient, content });
+      // Populate sender and recipient for frontend
+      const populatedMsg = await Message.findById(message._id).populate('sender').populate('recipient');
+      // Emit to sender and recipient
+      io.to(sender.toString()).emit('newMessage', populatedMsg);
+      io.to(recipient.toString()).emit('newMessage', populatedMsg);
+    } catch (err) {
+      console.error('[Socket chatMessage error]', err);
+    }
+  });
+});
 
 // ================================
 // ✅ CORS CONFIGURATION

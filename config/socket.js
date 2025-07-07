@@ -52,6 +52,12 @@ const initSocket = (server) => {
       console.log(`User ${socket.id} joined room ${roomId}`);
     });
 
+    // Handle joining a user-specific room for personal messages
+    socket.on('join_user_room', (userId) => {
+      socket.join(userId);
+      console.log(`User ${socket.id} joined user room ${userId}`);
+    });
+
     // Handle leaving a room
     socket.on('leave_room', (roomId) => {
       socket.leave(roomId);
