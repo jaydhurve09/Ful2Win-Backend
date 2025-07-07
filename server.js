@@ -170,6 +170,7 @@ app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/car-racing', carRacingRoute);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/users', userRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/score', Scorerouter);
