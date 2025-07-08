@@ -55,6 +55,17 @@ const server = createServer(app);
 initSocket(server);
 
 // ================================
+// ✅ MIDDLEWARE CONFIGURATION
+// ================================
+// Body parsing middleware with increased limits
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(fileUpload());
+
+// Static files (if needed)
+// app.use(express.static(path.join(__dirname, 'public')));
+
+// ================================
 // ✅ CORS CONFIGURATION
 // ================================
 // Allowed origins for CORS
@@ -87,7 +98,11 @@ const envOrigins = [
   process.env.VITE_API_BACKEND_URL,
   process.env.NEXT_PUBLIC_API_URL,
   process.env.REACT_APP_API_URL,
-  process.env.LOCAL
+  process.env.LOCAL,
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
 ].filter(Boolean);
 
 envOrigins.forEach(url => {
@@ -266,6 +281,27 @@ app.use((err, req, res, next) => {
     success: false,
     message: 'Internal Server Error',
     ...(process.env.NODE_ENV === 'development' && { error: err.message })
+  });
+});
+
+// ================================
+// ✅ ERROR HANDLING MIDDLEWARE
+// ================================
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal Server Error',
+    error: process.env.NODE_ENV === 'development' ? err.message : {}
+  });
+});
+
+// Handle 404
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'API endpoint does not exist',
+    path: req.originalUrl
   });
 });
 
