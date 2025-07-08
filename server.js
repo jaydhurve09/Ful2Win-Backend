@@ -57,9 +57,37 @@ initSocket(server);
 // ================================
 // ✅ MIDDLEWARE CONFIGURATION
 // ================================
-// Body parsing middleware with increased limits
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.originalUrl}`, {
+    body: req.body,
+    headers: req.headers,
+    query: req.query,
+    params: req.params
+  });
+  next();
+});
+
+// Body parsing middleware with increased limits and strict mode false
+app.use(express.json({ 
+  limit: '50mb',
+  strict: false, // Allow non-array/object JSON
+  verify: (req, res, buf) => {
+    try {
+      JSON.parse(buf);
+    } catch (e) {
+      console.error('JSON parse error:', e);
+      throw new Error('Invalid JSON');
+    }
+  }
+}));
+
+app.use(express.text({ type: 'application/json' })); // Parse text/plain as JSON
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '50mb'
+}));
+
 app.use(fileUpload());
 
 // Static files (if needed)

@@ -211,8 +211,24 @@ const loginUser = async (req, res) => {
   console.log('LOGIN REQUEST BODY:', req.body, 'TYPE:', typeof req.body);
 
   try {
-    // Accept both JSON and stringified JSON body
-    let { phoneNumber, phone, password } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    // Handle different request formats
+    let requestBody = req.body;
+    
+    // If body is a string, try to parse it as JSON
+    if (typeof requestBody === 'string') {
+      try {
+        requestBody = JSON.parse(requestBody);
+      } catch (parseError) {
+        console.error('Failed to parse request body:', requestBody);
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Invalid request format. Expected JSON.' 
+        });
+      }
+    }
+    
+    // Extract fields with fallbacks
+    const { phoneNumber, phone, password } = requestBody;
     const loginPhoneNumber = phoneNumber || phone;
     if (!loginPhoneNumber || !password) {
       return res.status(400).json({ success: false, message: 'phoneNumber (or phone) and password are required' });
