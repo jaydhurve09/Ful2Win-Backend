@@ -164,14 +164,22 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
     'Accept',
+    'Accept-Encoding',
+    'Authorization',
+    'Cache-Control',
+    'Content-Type',
     'Origin',
+    'Pragma',
+    'Referer',
+    'User-Agent',
+    'X-Requested-With',
     'X-Access-Token',
     'X-Refresh-Token',
-    'X-Client-Version'
+    'X-Client-Version',
+    'x-access-token',
+    'x-refresh-token',
+    'x-client-version'
   ],
   exposedHeaders: [
     'Content-Length',
@@ -182,7 +190,10 @@ const corsOptions = {
     'X-Total-Count',
     'X-Total-Pages',
     'X-Has-Next-Page',
-    'X-Refresh-Token'
+    'X-Refresh-Token',
+    'x-refresh-token',
+    'x-total-count',
+    'x-total-pages'
   ],
   maxAge: 86400, // 24 hours
   preflightContinue: false,
