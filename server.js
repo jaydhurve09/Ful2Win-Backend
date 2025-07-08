@@ -60,32 +60,49 @@ initSocket(server);
 // Allowed origins for CORS
 const prodOrigins = [
   'https://fulboost.fun',
-  'https://fulboost.fun/login',
   'https://www.fulboost.fun',
   'https://ful2win.vercel.app',
   'https://ful-2-win.vercel.app',
+  'https://api.fulboost.fun',
 ];
 
 const devOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
+  'http://localhost:5174',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://localhost',
+  'http://127.0.0.1'
 ];
 
 // Add dynamic origins from environment variables if present
-// TEMPORARY: Allow localhost origins in production for debugging
-// REMOVE THIS after local debugging is complete!
 let allowedOrigins = [...prodOrigins, ...devOrigins];
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
-}
-if (process.env.LOCAL) {
-  allowedOrigins.push(process.env.LOCAL.replace(/\/$/, ''));
-}
-// Remove duplicates
-const uniqueAllowedOrigins = [...new Set(allowedOrigins)];
+
+// Add environment variable origins if they exist
+const envOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.VITE_API_BACKEND_URL,
+  process.env.NEXT_PUBLIC_API_URL,
+  process.env.REACT_APP_API_URL,
+  process.env.LOCAL
+].filter(Boolean);
+
+envOrigins.forEach(url => {
+  try {
+    const cleanUrl = new URL(url).origin;
+    if (!allowedOrigins.includes(cleanUrl)) {
+      allowedOrigins.push(cleanUrl);
+    }
+  } catch (e) {
+    console.warn(`Invalid URL in environment variables: ${url}`);
+  }
+});
+
+// Remove duplicates and empty values
+const uniqueAllowedOrigins = [...new Set(allowedOrigins.filter(Boolean))];
 
 console.log('✅ Allowed CORS Origins:', uniqueAllowedOrigins);
 
@@ -116,29 +133,67 @@ const corsOptions = {
     'x-custom-header'
   ],
   origin: function (origin, callback) {
-    console.log(`[CORS] Incoming Origin: ${origin}`);
-  
+    // Allow requests with no origin (like mobile apps, curl, or server-side requests)
     if (!origin) {
-      console.log('[CORS] No origin provided, allowing non-browser request (curl / server)');
+      console.log('[CORS] No origin provided, allowing non-browser request');
       return callback(null, true);
     }
-  
-    if (uniqueAllowedOrigins.includes(origin)) {
+
+    // Check if the origin is in the allowed list
+    const originAllowed = uniqueAllowedOrigins.some(allowedOrigin => {
+      // Support wildcard subdomains
+      if (allowedOrigin.includes('*')) {
+        const regex = new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$');
+        return regex.test(origin);
+      }
+      // Check exact match or subdomain match
+      return origin === allowedOrigin || 
+             origin === `https://${allowedOrigin}` || 
+             origin === `http://${allowedOrigin}`;
+    });
+
+    if (originAllowed) {
       console.log(`[CORS] ✅ Origin allowed: ${origin}`);
-      return callback(null, true); // Tell CORS to allow this origin
+      return callback(null, true);
     } else {
       console.log(`[CORS] 🚫 Origin NOT allowed: ${origin}`);
       console.log(`[CORS] Allowed origins:`, uniqueAllowedOrigins);
-      return callback(new Error('Not allowed by CORS'));
+      return callback(new Error(`Not allowed by CORS. Origin ${origin} not in allowed list.`), false);
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
-  
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'X-Access-Token',
+    'X-Refresh-Token',
+    'X-Client-Version'
+  ],
+  exposedHeaders: [
+    'Content-Length',
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'X-Total-Count',
+    'X-Total-Pages',
+    'X-Has-Next-Page',
+    'X-Refresh-Token'
+  ],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 
-// Place CORS middleware at the very top
+// Handle preflight requests first
+app.options('*', cors(corsOptions));
+
+// Apply CORS to all routes
 app.use(cors(corsOptions));
 
 // Log every incoming request for debugging
