@@ -275,6 +275,38 @@ app.use(fileUpload({
 // ================================
 // ✅ API ROUTES
 // ================================
+// Add detailed logging for all incoming requests
+app.use((req, res, next) => {
+  console.log('\n🔹 Incoming Request:', {
+    method: req.method,
+    url: req.originalUrl,
+    path: req.path,
+    query: req.query,
+    body: req.body,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? '***' : 'none',
+      'origin': req.headers['origin']
+    }
+  });
+  next();
+});
+
+// Add specific logging for /api/score routes
+app.use('/api/score', (req, res, next) => {
+  console.log('\n🔍 /api/score Route Hit:', {
+    method: req.method,
+    url: req.originalUrl,
+    body: req.body,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? '***' : 'none'
+    }
+  });
+  next();
+});
+
+// Mount all API routes
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
@@ -288,6 +320,17 @@ app.use('/api/score', Scorerouter);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/follow', followRoutes);
 app.use('/api/messages', messageRoutes);
+
+// Log unhandled requests
+app.use((req, res, next) => {
+  console.log('\n❌ Unhandled Request:', {
+    method: req.method,
+    url: req.originalUrl,
+    path: req.path,
+    query: req.query
+  });
+  next();
+});
 
 // ================================
 // ✅ STATIC FILES
