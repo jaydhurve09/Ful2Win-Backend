@@ -81,10 +81,15 @@ const MyScore = async (req, res) => {
   // get score of all user of this room
  const getScore = async (req, res) => {
   try {
-    const { roomId, gameName } = req.body;
- 
+    // Get from query params if GET, from body if POST
+    const { roomId, gameName } = req.method === 'GET' ? req.query : req.body;
+    
     if (!roomId || !gameName) {
-      return res.status(400).json({ message: "Room ID and Game Name are required" });
+      return res.status(400).json({ 
+        message: "Room ID and Game Name are required",
+        received: { roomId, gameName },
+        method: req.method
+      });
     }
 
     // This line WILL return all scores that match both roomId and gameName
