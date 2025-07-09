@@ -81,32 +81,76 @@ const MyScore = async (req, res) => {
   // get score of all user of this room
  const getScore = async (req, res) => {
   try {
+    console.log('[getScore] Request received:', {
+      method: req.method,
+      url: req.originalUrl,
+      query: req.query,
+      body: req.body,
+      params: req.params
+    });
+
     // Get from query params if GET, from body if POST
     const { roomId, gameName } = req.method === 'GET' ? req.query : req.body;
     
+    console.log('[getScore] Extracted parameters:', { roomId, gameName });
+    
     if (!roomId || !gameName) {
+      const errorMsg = 'Room ID and Game Name are required';
+      console.error(`[getScore] ${errorMsg}`, { roomId, gameName });
       return res.status(400).json({ 
-        message: "Room ID and Game Name are required",
+        message: errorMsg,
         received: { roomId, gameName },
         method: req.method
       });
     }
 
+    console.log('[getScore] Querying database with:', { roomId, gameName });
+    
     // This line WILL return all scores that match both roomId and gameName
     const scores = await scoreModel.find({ roomId, gameName }).sort({ score: -1 });
+    console.log('[getScore] Database query results:', { found: scores?.length || 0 });
 
     if (!scores || scores.length === 0) {
-      return res.status(404).json({ message: "No scores found for this room and game" });
+      console.log('[getScore] No scores found for:', { roomId, gameName });
+      return res.status(404).json({ 
+        message: "No scores found for this room and game",
+        roomId,
+        gameName
+      });
     }
 
-    return res.status(200).json({
+    const response = {
       message: "Scores retrieved successfully",
       total: scores.length,
-      scores, // all scores for given room and game
+      scores,
+      requestDetails: {
+        roomId,
+        gameName,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    console.log('[getScore] Sending response with scores:', { 
+      total: response.total,
+      sampleScore: response.scores[0] 
     });
+    
+    return res.status(200).json(response);
   } catch (error) {
-    console.error("Error retrieving scores:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error('[getScore] Error:', {
+      message: error.message,
+      stack: error.stack,
+      request: {
+        method: req.method,
+        url: req.originalUrl,
+        query: req.query,
+        body: req.body
+      }
+    });
+    return res.status(500).json({ 
+      message: "Internal server error",
+      error: error.message 
+    });
   }
 };
 // POST /score/played-tournaments
