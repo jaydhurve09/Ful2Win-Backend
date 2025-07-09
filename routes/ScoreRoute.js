@@ -7,8 +7,6 @@ import { gameScore,MyScore,getScore,PlayedTournaments } from '../controllers/gam
 Scorerouter.post('/submit-score', gameScore);
 Scorerouter.post('/Myscore', MyScore);
 // Handle both GET and POST for /get-score
-Scorerouter.route('/get-score')
-  .get(getScore)
-  .post(getScore);
+Scorerouter.get('/get-score',get-score);
 Scorerouter.post('/display', PlayedTournaments);
 export default Scorerouter;
