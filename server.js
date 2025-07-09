@@ -307,20 +307,43 @@ app.use((req, res, next) => {
 //   next();
 // });
 
+// Mount all API routes with request logging
+const mountRoutes = (path, router) => {
+  app.use(path, (req, res, next) => {
+    console.log(`\n🔹 Mounted Route: ${req.method} ${path}${req.path}`);
+    next();
+  }, router);
+};
+
 // Mount all API routes
-app.use('/api/posts', postRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/tournaments', tournamentRoutes);
-app.use('/api/car-racing', carRacingRoute);
-app.use('/api/wallet', walletRoutes);
-app.use('/api/referrals', referralRoutes);
+mountRoutes('/api/posts', postRoutes);
+mountRoutes('/api/games', gameRoutes);
+mountRoutes('/api/tournaments', tournamentRoutes);
+mountRoutes('/api/car-racing', carRacingRoute);
+mountRoutes('/api/wallet', walletRoutes);
+mountRoutes('/api/referrals', referralRoutes);
 app.use('/users', userRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/score', Scorerouter);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/follow', followRoutes);
-app.use('/api/messages', messageRoutes);
+mountRoutes('/api/auth', authRoutes);
+
+// Mount score routes with additional logging
+app.use('/api/score', (req, res, next) => {
+  console.log('\n🔹 Score Route Hit:', {
+    method: req.method,
+    url: req.originalUrl,
+    path: req.path,
+    body: req.body,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? '***' : 'none'
+    }
+  });
+  next();
+}, Scorerouter);
+
+mountRoutes('/api/notifications', notificationRoutes);
+mountRoutes('/api/follow', followRoutes);
+mountRoutes('/api/messages', messageRoutes);
 
 // Log unhandled requests
 app.use((req, res, next) => {
