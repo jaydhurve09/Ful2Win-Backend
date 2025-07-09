@@ -68,36 +68,42 @@ app.use((req, res, next) => {
   next();
 });
 
-// Body parsing middleware with increased limits and better error handling
-app.use(express.json({ 
-  limit: '50mb',
-  strict: false // Allow non-array/object JSON
-}));
-
-// Handle JSON parsing errors
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    console.error('JSON Parse Error:', err.message);
-    return res.status(400).json({ 
-      success: false,
-      message: 'Invalid JSON in request body',
-      error: err.message 
-    });
-  }
-  next();
-});
-
-// Parse text/plain as JSON
-app.use(express.text({ 
+// Raw body parser for JSON
+app.use(express.raw({ 
   type: 'application/json',
   limit: '50mb'
 }));
+
+// Parse JSON bodies
+app.use((req, res, next) => {
+  if (req.is('application/json')) {
+    try {
+      if (Buffer.isBuffer(req.body) && req.body.length) {
+        req.body = JSON.parse(req.body.toString());
+      }
+    } catch (e) {
+      console.error('JSON parse error:', e);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid JSON in request body',
+        error: e.message
+      });
+    }
+  }
+  next();
+});
 
 // Parse URL-encoded bodies
 app.use(express.urlencoded({ 
   extended: true, 
   limit: '50mb',
   parameterLimit: 100000
+}));
+
+// Text parser as fallback
+app.use(express.text({ 
+  type: ['text/*', 'application/json'],
+  limit: '50mb'
 }));
 
 app.use(fileUpload());

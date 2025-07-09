@@ -2,13 +2,37 @@ import scoreModel from "../models/Score.js";
 import Tournament from "../models/Tournament.js";
 
 
- const gameScore = async (req, res) => {
+const gameScore = async (req, res) => {
   try {
-    const { userId, userName, score, roomId, gameName } = req.body;
-    console.log("Received score submission:", req.body);
-         
-    if (!userId || score === undefined || score === null || !roomId || !gameName) {
-      return res.status(400).json({ message: "All fields are required" });
+    console.log('Request headers:', req.headers);
+    console.log('Raw body:', req.body);
+    
+    if (!req.body || typeof req.body !== 'object') {
+      console.error('Invalid request body:', req.body);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid request body',
+        received: req.body
+      });
+    }
+
+    const { userId, userName, score, roomId, gameName, gameId } = req.body;
+    console.log('Parsed score submission:', { userId, userName, score, roomId, gameName, gameId });
+    
+    // Validate required fields
+    const missingFields = [];
+    if (!userId) missingFields.push('userId');
+    if (score === undefined || score === null) missingFields.push('score');
+    if (!roomId) missingFields.push('roomId');
+    if (!gameName) missingFields.push('gameName');
+    
+    if (missingFields.length > 0) {
+      console.error('Missing required fields:', missingFields);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Missing required fields',
+        missingFields
+      });
     }
 
     // Step 1: Auto-register if not already registered
