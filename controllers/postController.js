@@ -10,20 +10,26 @@ import { uploadToCloudinary } from '../config/cloudinary.js';
  */
 const createPost = async (req, res) => {
   try {
+    console.log('Request body:', req.body);
+    console.log('Request file:', req.file);
+    
     const { content, tags } = req.body;
     const author = req.user.id; // Get user ID from auth middleware
 
     // Validate required fields
-    if (!content) {
-      return res.status(400).json({ message: 'Content is required' });
+    if (!content && !req.file) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Either content or an image is required' 
+      });
     }
 
     // Create post data object
     const postData = {
-      title: content.substring(0, 50) + (content.length > 50 ? '...' : ''), // Auto-generate title from content
-      content,
+      title: content ? content.substring(0, 50) + (content.length > 50 ? '...' : '') : 'New Post',
+      content: content || '',
       author,
-      tags: tags ? tags.split(',').map(tag => tag.trim()) : []
+      tags: (tags && typeof tags === 'string') ? tags.split(',').map(tag => tag.trim()) : []
     };
 
     // Handle file upload if present
@@ -47,7 +53,7 @@ const createPost = async (req, res) => {
             duration: result.duration
           };
           
-          // For backward compatibility, also set the images array
+          // Set the images array for compatibility
           if (result.resource_type === 'image') {
             postData.images = [{
               url: result.secure_url,
