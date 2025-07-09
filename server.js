@@ -291,20 +291,21 @@ app.use((req, res, next) => {
   });
   next();
 });
-
-// Add specific logging for /api/score routes
-app.use('/api/score', (req, res, next) => {
-  console.log('\n🔍 /api/score Route Hit:', {
-    method: req.method,
-    url: req.originalUrl,
-    body: req.body,
-    headers: {
-      'content-type': req.headers['content-type'],
-      'authorization': req.headers['authorization'] ? '***' : 'none'
-    }
-  });
-  next();
-});
+// Mount the Scorerouter at /api/score
+// app.use('/api/score', Scorerouter);
+// // Add specific logging for /api/score routes
+// app.use('/api/score', (req, res, next) => {
+//   console.log('\n🔍 /api/score Route Hit:', {
+//     method: req.method,
+//     url: req.originalUrl,
+//     body: req.body,
+//     headers: {
+//       'content-type': req.headers['content-type'],
+//       'authorization': req.headers['authorization'] ? '***' : 'none'
+//     }
+//   });
+//   next();
+// });
 
 // Mount all API routes
 app.use('/api/posts', postRoutes);
