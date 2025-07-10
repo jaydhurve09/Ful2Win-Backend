@@ -51,9 +51,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = createServer(app);
+const httpServer = createServer(app);
+
+// Trust first proxy (nginx)
+app.set('trust proxy', true);
+
+// Increase request size limit for file uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 // Attach Socket.io to the HTTP server
-initSocket(server);
+initSocket(httpServer);
 
 // ================================
 // ✅ MIDDLEWARE CONFIGURATION
@@ -183,8 +191,21 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // Allow all origins in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[CORS] Development mode - allowing all origins`);
+      return callback(null, true);
+    }
+
+    // In production, only allow specific origins
+    const allowedOrigins = [
+      'https://fulboost.fun',
+      'https://www.fulboost.fun',
+      'https://api.fulboost.fun'
+    ];
+
     // Check if the origin is in the allowed list
-    const originAllowed = uniqueAllowedOrigins.some(allowedOrigin => {
+    const originAllowed = allowedOrigins.some(allowedOrigin => {
       // Support wildcard subdomains
       if (allowedOrigin.includes('*')) {
         const regex = new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$');
@@ -201,7 +222,7 @@ const corsOptions = {
       return callback(null, true);
     } else {
       console.log(`[CORS] 🚫 Origin NOT allowed: ${origin}`);
-      console.log(`[CORS] Allowed origins:`, uniqueAllowedOrigins);
+      console.log(`[CORS] Allowed origins:`, allowedOrigins);
       return callback(new Error(`Not allowed by CORS. Origin ${origin} not in allowed list.`), false);
     }
   },
