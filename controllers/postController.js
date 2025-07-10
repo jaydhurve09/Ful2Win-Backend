@@ -35,15 +35,15 @@ const createPost = async (req, res) => {
     // Handle file upload if present
     if (req.file) {
       try {
-        // (only once at top if not already imported)
-
-const fileData = fs.readFileSync(req.file.path);
-const dataUri = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
-
-        // Convert buffer to data URI for Cloudinary
+        // Ensure Cloudinary is configured
+        const { connectCloudinary } = await import('../config/cloudinary.js');
+        await connectCloudinary();
         
+        const fileData = fs.readFileSync(req.file.path);
+        const dataUri = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
         
         // Upload to Cloudinary using the configured function
+        console.log('[Cloudinary] Attempting to upload file to Cloudinary...');
         const result = await uploadToCloudinary(dataUri, 'posts');
         
         // Add media to post data based on resource type
