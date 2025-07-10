@@ -38,6 +38,7 @@ import authRoutes from './routes/authRoutes.js';
 import Scorerouter from './routes/ScoreRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
+import postRoute from './routes/postRoute.js';
 
 dotenv.config();
 
@@ -68,41 +69,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// Raw body parser for JSON
-app.use(express.raw({ 
-  type: 'application/json',
-  limit: '50mb'
-}));
-
-// Parse JSON bodies
-app.use((req, res, next) => {
-  if (req.is('application/json')) {
+// Body parsing middleware with increased limits and strict mode false
+app.use(express.json({ 
+  limit: '50mb',
+  strict: false, // Allow non-array/object JSON
+  verify: (req, res, buf) => {
     try {
-      if (Buffer.isBuffer(req.body) && req.body.length) {
-        req.body = JSON.parse(req.body.toString());
-      }
+      JSON.parse(buf);
     } catch (e) {
       console.error('JSON parse error:', e);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid JSON in request body',
-        error: e.message
-      });
+      throw new Error('Invalid JSON');
     }
   }
-  next();
-});
-
-// Parse URL-encoded bodies
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: '50mb',
-  parameterLimit: 100000
 }));
 
-// Text parser as fallback
-app.use(express.text({ 
-  type: ['text/*', 'application/json'],
+app.use(express.text({ type: 'application/json' })); // Parse text/plain as JSON
+app.use(express.urlencoded({ 
+  extended: true, 
   limit: '50mb'
 }));
 
@@ -309,47 +292,12 @@ app.use((req, res, next) => {
   });
   next();
 });
-// Mount the Scorerouter at /api/score
-// app.use('/api/score', Scorerouter);
-// // Add specific logging for /api/score routes
-// app.use('/api/score', (req, res, next) => {
-//   console.log('\n🔍 /api/score Route Hit:', {
-//     method: req.method,
-//     url: req.originalUrl,
-//     body: req.body,
-//     headers: {
-//       'content-type': req.headers['content-type'],
-//       'authorization': req.headers['authorization'] ? '***' : 'none'
-//     }
-//   });
-//   next();
-// });
 
-// Mount all API routes with request logging
-const mountRoutes = (path, router) => {
-  app.use(path, (req, res, next) => {
-    console.log(`\n🔹 Mounted Route: ${req.method} ${path}${req.path}`);
-    next();
-  }, router);
-};
-
-// Mount all API routes
-mountRoutes('/api/posts', postRoutes);
-mountRoutes('/api/games', gameRoutes);
-mountRoutes('/api/tournaments', tournamentRoutes);
-mountRoutes('/api/car-racing', carRacingRoute);
-mountRoutes('/api/wallet', walletRoutes);
-mountRoutes('/api/referrals', referralRoutes);
-app.use('/users', userRoutes);
-app.use('/api/users', userRoutes);
-mountRoutes('/api/auth', authRoutes);
-
-// Mount score routes with additional logging
+// Add specific logging for /api/score routes
 app.use('/api/score', (req, res, next) => {
-  console.log('\n🔹 Score Route Hit:', {
+  console.log('\n🔍 /api/score Route Hit:', {
     method: req.method,
     url: req.originalUrl,
-    path: req.path,
     body: req.body,
     headers: {
       'content-type': req.headers['content-type'],
@@ -357,11 +305,23 @@ app.use('/api/score', (req, res, next) => {
     }
   });
   next();
-}, Scorerouter);
+});
 
-mountRoutes('/api/notifications', notificationRoutes);
-mountRoutes('/api/follow', followRoutes);
-mountRoutes('/api/messages', messageRoutes);
+// Mount all API routes
+app.use('/api/post', postRoute);
+app.use('/api/posts', postRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/car-racing', carRacingRoute);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/users', userRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/score', Scorerouter);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/follow', followRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Log unhandled requests
 app.use((req, res, next) => {

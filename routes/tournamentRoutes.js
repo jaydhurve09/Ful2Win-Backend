@@ -68,7 +68,7 @@ router.delete('/:id', deleteTournament);
 
 // Register player for tournament
 router.post('/:tournamentId/register', registerPlayer);
-router.put('/:tournamentId/status', updateStatus);
+router.post('/:tournamentId/status', updateStatus);
 
 // Get leaderboard for a tournament
 router.get('/:tournamentId/leaderboard', getTournamentLeaderboard);
