@@ -147,17 +147,20 @@ envOrigins.forEach(url => {
 // Remove duplicates and empty values
 const uniqueAllowedOrigins = [...new Set(allowedOrigins.filter(Boolean))];
 
-console.log('✅ Allowed CORS Origins:', uniqueAllowedOrigins);
-
 // Log environment variables relevant to CORS and deployment
 console.log('🛠️ NODE_ENV:', process.env.NODE_ENV);
 console.log('🛠️ FRONTEND_URL:', process.env.FRONTEND_URL);
 console.log('🛠️ LOCAL:', process.env.LOCAL);
 console.log('🛠️ PORT:', process.env.PORT);
 
+// CORS configuration - Disabled here since it's handled by nginx
 const corsOptions = {
+  origin: false, // Disable CORS in the application since it's handled by nginx
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Accept',
+    'Accept-Encoding',
     'Authorization',
     'Cache-Control',
     'Content-Type',
@@ -175,87 +178,14 @@ const corsOptions = {
     'x-access-token', // Add any other custom headers you use
     'x-custom-header'
   ],
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, or server-side requests)
-    if (!origin) {
-      console.log('[CORS] No origin provided, allowing non-browser request');
-      return callback(null, true);
-    }
-
-    // Allow all origins in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[CORS] Development mode - allowing all origins`);
-      return callback(null, true);
-    }
-
-    // In production, only allow specific origins
-    const allowedOrigins = [
-      'https://fulboost.fun',
-      'https://www.fulboost.fun',
-      'https://api.fulboost.fun'
-    ];
-
-    // Check if the origin is in the allowed list
-    const originAllowed = allowedOrigins.some(allowedOrigin => {
-      // Support wildcard subdomains
-      if (allowedOrigin.includes('*')) {
-        const regex = new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$');
-        return regex.test(origin);
-      }
-      // Check exact match or subdomain match
-      return origin === allowedOrigin || 
-             origin === `https://${allowedOrigin}` || 
-             origin === `http://${allowedOrigin}`;
-    });
-
-    if (originAllowed) {
-      console.log(`[CORS] ✅ Origin allowed: ${origin}`);
-      return callback(null, true);
-    } else {
-      console.log(`[CORS] 🚫 Origin NOT allowed: ${origin}`);
-      console.log(`[CORS] Allowed origins:`, allowedOrigins);
-      return callback(new Error(`Not allowed by CORS. Origin ${origin} not in allowed list.`), false);
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Accept',
-    'Accept-Encoding',
-    'Authorization',
-    'Cache-Control',
-    'Content-Type',
-    'Origin',
-    'Pragma',
-    'Referer',
-    'User-Agent',
-    'X-Requested-With',
-    'X-Access-Token',
-    'X-Refresh-Token',
-    'X-Client-Version',
-    'x-access-token',
-    'x-refresh-token',
-    'x-client-version'
-  ],
   exposedHeaders: [
     'Content-Length',
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
+    'Content-Range',
     'X-Total-Count',
     'X-Total-Pages',
-    'X-Has-Next-Page',
-    'X-Refresh-Token',
-    'x-refresh-token',
-    'x-total-count',
-    'x-total-pages'
-  ],
-  maxAge: 86400, // 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+    'X-Has-Next-Page'
+  ]
 };
-
 
 // Handle preflight requests first
 app.options('*', cors(corsOptions));
