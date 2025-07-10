@@ -80,18 +80,9 @@ app.use('/api/post', postRoute);
 // Body parsing middleware with increased limits and strict mode false
 app.use(express.json({ 
   limit: '50mb',
-  strict: false, // Allow non-array/object JSON
-  verify: (req, res, buf) => {
-    try {
-      JSON.parse(buf);
-    } catch (e) {
-      console.error('JSON parse error:', e);
-      throw new Error('Invalid JSON');
-    }
-  }
+  strict: false // Allow non-array/object JSON
 }));
 
-app.use(express.text({ type: 'application/json' })); // Parse text/plain as JSON
 app.use(express.urlencoded({ 
   extended: true, 
   limit: '50mb'

@@ -255,7 +255,8 @@ const deletePost = async (req, res) => {
  */
 const likePost = async (req, res) => {
   try {
-    const { postId, userId } = req.body;
+    const { postId, } = req.body;
+    const userId = req.user.id;
     // Find the post by ID
     const post = await Post.findById(postId);
     if (!post) {
@@ -288,7 +289,8 @@ const likePost = async (req, res) => {
  */
 const unlikePost = async (req, res) => {
   try {
-    const { postId, userId } = req.body;
+    const { postId} = req.body;
+    const userId = req.user.id;
     // Find the post by ID
     const post = await Post.findById(postId);
     if (!post) {
