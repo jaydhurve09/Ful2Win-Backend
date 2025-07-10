@@ -54,6 +54,7 @@ const upload = multer({
 // Error handling middleware for multer
 const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
+    
     // A Multer error occurred when uploading
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({

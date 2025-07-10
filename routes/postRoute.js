@@ -8,14 +8,15 @@ import {
   commentOnPost 
 } from '../controllers/postController.js';
 import { upload, handleMulterError } from '../middleware/multer.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const postRoute = express.Router();
 
 // Create a new post with image upload
-postRoute.post('/create', upload.single('image'), handleMulterError, createPost);
+postRoute.post('/create',protect, upload.single('image'), handleMulterError,  createPost);
 
 // Delete a post
-postRoute.post('/remove', deletePost);
+postRoute.post('/remove', protect, deletePost);
 
 // Update a post
 postRoute.post('/update', updatePost);

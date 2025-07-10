@@ -2,7 +2,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import Post from '../models/Post.js';
 import User from '../models/User.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
-
+import fs from 'fs'; 
 /**
  * @desc    Create a new post
  * @route   POST /api/posts
@@ -17,7 +17,7 @@ const createPost = async (req, res) => {
     const author = req.user.id; // Get user ID from auth middleware
 
     // Validate required fields
-    if (!content && !req.file) {
+    if (!content && !req.file.path) {
       return res.status(400).json({ 
         success: false,
         message: 'Either content or an image is required' 
@@ -35,8 +35,13 @@ const createPost = async (req, res) => {
     // Handle file upload if present
     if (req.file) {
       try {
+        // (only once at top if not already imported)
+
+const fileData = fs.readFileSync(req.file.path);
+const dataUri = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
+
         // Convert buffer to data URI for Cloudinary
-        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        
         
         // Upload to Cloudinary using the configured function
         const result = await uploadToCloudinary(dataUri, 'posts');
