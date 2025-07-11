@@ -754,7 +754,6 @@ export {
   likePost,
   unlikePost,
   commentOnPost,
-  // Add other methods that are used in routes
   getPosts,
   getPostById,
   getPostsByUser,
@@ -765,6 +764,7 @@ export {
   updateComment,
   deleteComment,
   likeComment,
+  unlikeComment,
   replyToComment,
   toggleSavePost,
   reportPost,
@@ -772,6 +772,8 @@ export {
   getPendingPosts,
   updatePostStatus
 };
+
+
 
 // Stub implementations for methods that are used in routes but not yet implemented
 const getPosts = async (req, res) => {
