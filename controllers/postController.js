@@ -17,7 +17,7 @@ const createPost = async (req, res) => {
     const author = req.user.id; // Get user ID from auth middleware
 
     // Validate required fields
-    if (!content && !req.file.path) {
+    if (!content && (!req.file || !req.file.path)) {
       return res.status(400).json({ 
         success: false,
         message: 'Either content or an image is required' 
