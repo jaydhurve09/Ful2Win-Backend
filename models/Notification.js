@@ -9,7 +9,23 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['follow', 'challenge', 'profile_update', 'tournament_reminder', 'level_up', 'achievement']
+    enum: [
+      // Existing types
+      'follow', 
+      'challenge', 
+      'profile_update', 
+      'tournament_reminder', 
+      'level_up', 
+      'achievement',
+      // New types
+      'new_game',
+      'tournament_announcement',
+      'game_update',
+      'tournament_results',
+      'announcement',
+      'test',
+      'custom'
+    ]
   },
   message: {
     type: String,

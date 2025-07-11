@@ -332,6 +332,76 @@ export const notifyAchievementUnlocked = async (userId, achievementName, achieve
   }
 };
 
+/**
+ * Send a custom notification to specific users
+ * @param {string[]} userIds - Array of user IDs to notify
+ * @param {string} title - Notification title
+ * @param {string} message - Notification message
+ * @param {string} type - Notification type (default: 'custom')
+ * @param {object} data - Additional data for the notification
+ * @param {object} req - Express request object (for socket.io)
+ */
+const sendCustomNotificationToUsers = async (userIds, title, message, type = 'custom', data = {}, req = {}) => {
+  try {
+    const notifications = [];
+    const notificationPromises = userIds.map(async (userId) => {
+      const notification = await createNotification(userId, type, message, { ...data, title });
+      notifications.push(notification);
+      
+      // Emit real-time notification if socket.io is available
+      if (req.app) {
+        const io = req.app.get('socketio');
+        if (io) {
+          io.to(`user_${userId}`).emit('newNotification', notification);
+        }
+      }
+    });
+    
+    await Promise.all(notificationPromises);
+    return { success: true, count: notifications.length, notifications };
+  } catch (error) {
+    console.error('Error sending custom notifications:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send a custom notification to all users
+ * @param {string} title - Notification title
+ * @param {string} message - Notification message
+ * @param {string} type - Notification type (default: 'announcement')
+ * @param {object} data - Additional data for the notification
+ * @param {object} req - Express request object (for socket.io)
+ */
+const broadcastNotification = async (title, message, type = 'announcement', data = {}, req = {}) => {
+  try {
+    // Get all active users (you might want to add pagination for large user bases)
+    const users = await User.find({ isActive: true }).select('_id');
+    const userIds = users.map(user => user._id);
+    
+    // Pass the request object to access socket.io
+    const result = await sendCustomNotificationToUsers(userIds, title, message, type, data, req);
+    
+    // Emit to all connected clients if socket.io is available
+    if (req.app) {
+      const io = req.app.get('socketio');
+      if (io) {
+        io.emit('broadcastNotification', {
+          type,
+          title,
+          message,
+          ...data
+        });
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error broadcasting notification:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 export default {
   getUserNotifications,
   markNotificationsAsRead,
@@ -341,5 +411,7 @@ export default {
   scheduleTournamentReminders,
   cancelTournamentReminders,
   notifyLevelUp,
-  notifyAchievementUnlocked
+  notifyAchievementUnlocked,
+  sendCustomNotificationToUsers,
+  broadcastNotification
 };
