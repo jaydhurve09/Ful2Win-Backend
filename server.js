@@ -60,7 +60,12 @@ initSocket(server);
 // ================================
 // Request logging middleware
 app.use((req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    return next(); // skip express.json & urlencoded
+  }
   console.log(`${req.method} ${req.originalUrl}`, {
+    
     body: req.body,
     headers: req.headers,
     query: req.query,
@@ -68,28 +73,19 @@ app.use((req, res, next) => {
   });
   next();
 });
-app.use('/api/post', postRoute);
+
 // Body parsing middleware with increased limits and strict mode false
 app.use(express.json({ 
   limit: '50mb',
-  strict: false, // Allow non-array/object JSON
-  verify: (req, res, buf) => {
-    try {
-      JSON.parse(buf);
-    } catch (e) {
-      console.error('JSON parse error:', e);
-      throw new Error('Invalid JSON');
-    }
-  }
+  strict: false // Allow non-array/object JSON
 }));
 
-app.use(express.text({ type: 'application/json' })); // Parse text/plain as JSON
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: '50mb'
-}));
+// app.use(express.urlencoded({ 
+//   extended: true, 
+//   limit: '50mb'
+// }));
 
-app.use(fileUpload());
+//app.use(fileUpload());
 
 // Static files (if needed)
 // app.use(express.static(path.join(__dirname, 'public')));
@@ -173,6 +169,7 @@ const corsOptions = {
     'X-Requested-With',
     'login',
     'blocked',
+     'x-request-id', 
     'x-access-token', // Add any other custom headers you use
     'x-custom-header'
   ],
@@ -221,9 +218,14 @@ const corsOptions = {
     'X-Access-Token',
     'X-Refresh-Token',
     'X-Client-Version',
+    'X-Request-Id',
     'x-access-token',
     'x-refresh-token',
-    'x-client-version'
+    'x-client-version',
+    'x-request-id',
+    'login',
+    'blocked',
+    'x-custom-header'
   ],
   exposedHeaders: [
     'Content-Length',
@@ -261,17 +263,16 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+//app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-app.use(fileUpload({
-  useTempFiles: true,
-  tempFileDir: path.join(__dirname, 'tmp'),
-  createParentPath: true,
-  limits: { fileSize: 50 * 1024 * 1024 },
-  safeFileNames: true,
-  preserveExtension: 4
-}));
+// app.use(fileUpload({
+//   useTempFiles: true,
+//   tempFileDir: path.join(__dirname, 'tmp'),
+//   createParentPath: true,
+//   limits: { fileSize: 50 * 1024 * 1024 },
+//   safeFileNames: true,
+//   preserveExtension: 4
+// }));
 
 // ================================
 // ✅ API ROUTES
@@ -308,7 +309,7 @@ app.use('/api/score', (req, res, next) => {
 });
 
 // Mount all API routes
-
+app.use('/api/post', postRoute);
 app.use('/api/posts', postRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
