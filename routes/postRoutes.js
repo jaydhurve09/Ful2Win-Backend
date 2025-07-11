@@ -44,8 +44,7 @@ router.delete('/:id', protect, postController.deletePost);
 // Like / Unlike a post
 router.post('/like', protect, postController.likePost);
 router.post('/unlike', protect, postController.unlikePost);
-
-// Save / Unsave a post
+// Save/Unsave a post
 router.post('/:id/save', protect, postController.toggleSavePost);
 
 // Report a post

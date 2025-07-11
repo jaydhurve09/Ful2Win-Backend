@@ -255,8 +255,9 @@ const deletePost = async (req, res) => {
  */
 const likePost = async (req, res) => {
   try {
-    const { postId, } = req.body;
+    const { postId } = req.body;
     const userId = req.user.id;
+
     // Find the post by ID
     const post = await Post.findById(postId);
     if (!post) {
@@ -289,9 +290,9 @@ const likePost = async (req, res) => {
  */
 const unlikePost = async (req, res) => {
   try {
-    const { postId} = req.body;
-    const userId = req.user.id;
+    const { postId } = req.body;
     // Find the post by ID
+    const userId = req.user.id;
     const post = await Post.findById(postId);
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
@@ -303,7 +304,8 @@ const unlikePost = async (req, res) => {
     }
 
     // Remove the user ID from the likes array
-    post.likes = post.likes.filter((like) => like !== userId);
+    post.likes = post.likes.filter((like) => like.toString() !== userId.toString());
+
     // Save the updated post
     const updatedPost = await post.save();
     res.status(200).json({
