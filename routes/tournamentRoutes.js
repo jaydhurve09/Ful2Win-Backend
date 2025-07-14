@@ -67,10 +67,17 @@ router.get('/my', protect, async (req, res) => {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     console.log('DEBUG /api/tournaments/my userId:', userId);
-    // Directly fetch tournaments where currentPlayers array includes this user
-    const tournaments = await Tournament.find({ currentPlayers: userId });
+    // Fetch tournaments where currentPlayers array includes this user and populate game name
+    const tournaments = await Tournament.find({ currentPlayers: userId })
+      .populate('game', 'name');
     console.log('DEBUG /api/tournaments/my found tournaments:', tournaments.length);
-    res.json({ data: tournaments });
+    // Replace game field with its name for frontend simplicity
+    const formatted = tournaments.map(t => {
+      const obj = t.toObject();
+      obj.game = t.game?.name || t.game; // ensure string
+      return obj;
+    });
+    res.json({ data: formatted });
   } catch (error) {
     console.error('Error fetching user tournament history:', error.stack || error);
     res.status(500).json({ message: 'Failed to fetch tournament history', error: error.message });
