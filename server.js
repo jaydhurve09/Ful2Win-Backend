@@ -11,6 +11,8 @@ import { createServer } from 'http';
 import { initSocket } from './config/socket.js';
 import connectDB from './config/db.js';
 import { connectCloudinary } from './config/cloudinary.js';
+import challengeRoutes from './routes/challengeRoutes.js';
+
 
 // --- Security middleware suggestions (uncomment to enable in production) ---
 // import helmet from 'helmet';
@@ -39,6 +41,7 @@ import Scorerouter from './routes/ScoreRoute.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import followRoutes from './routes/followRoutes.js';
 import postRoute from './routes/postRoute.js';
+
 
 dotenv.config();
 
@@ -323,6 +326,7 @@ app.use('/api/score', Scorerouter);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/follow', followRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/challenges', challengeRoutes);
 
 // Log unhandled requests
 app.use((req, res, next) => {
