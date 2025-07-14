@@ -54,6 +54,29 @@ router.post('/',
 // Get all tournaments (with optional filtering)
 router.get('/', getTournaments);
 
+// Get tournaments for the logged-in user (history)
+import { protect } from '../middleware/authMiddleware.js';
+import Tournament from '../models/Tournament.js';
+
+router.get('/my', protect, async (req, res) => {
+  try {
+    console.log('DEBUG /api/tournaments/my req.user:', req.user);
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) {
+      console.error('No userId found on req.user:', req.user);
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+    console.log('DEBUG /api/tournaments/my userId:', userId);
+    // Directly fetch tournaments where currentPlayers array includes this user
+    const tournaments = await Tournament.find({ currentPlayers: userId });
+    console.log('DEBUG /api/tournaments/my found tournaments:', tournaments.length);
+    res.json({ data: tournaments });
+  } catch (error) {
+    console.error('Error fetching user tournament history:', error.stack || error);
+    res.status(500).json({ message: 'Failed to fetch tournament history', error: error.message });
+  }
+});
+
 // Get tournament by ID
 router.get('/:id', getTournamentById);
 
@@ -72,40 +95,6 @@ router.put('/:tournamentId/status', updateStatus);
 
 // Get leaderboard for a tournament
 router.get('/:tournamentId/leaderboard', getTournamentLeaderboard);
-
-// Get tournaments for the logged-in user
-import { protect } from '../middleware/authMiddleware.js';
-import Tournament from '../models/Tournament.js';
-
-router.get('/my', protect, async (req, res) => {
-  try {
-    console.log('DEBUG /api/tournaments/my req.user:', req.user);
-    const userId = req.user?._id || req.user?.id;
-    if (!userId) {
-      console.error('No userId found on req.user:', req.user);
-      return res.status(401).json({ message: 'User not authenticated' });
-    }
-    console.log('DEBUG /api/tournaments/my userId:', userId);
-    // Fetch the user from the database to get their tournaments array
-    const User = (await import('../models/User.js')).default;
-    const user = await User.findById(userId).select('tournaments');
-    if (!user) {
-      console.error('User not found in DB:', userId);
-      return res.status(404).json({ message: 'User not found' });
-    }
-    // user.tournaments is an array of objects, each with a tournamentId
-    const tournamentIds = (user.tournaments || []).map(t => t.tournamentId).filter(Boolean);
-    console.log('DEBUG /api/tournaments/my user.tournaments:', user.tournaments);
-    console.log('DEBUG /api/tournaments/my tournamentIds:', tournamentIds);
-    // Fetch tournaments by IDs from Tournament collection
-    const tournaments = await Tournament.find({ _id: { $in: tournamentIds } });
-    console.log('DEBUG /api/tournaments/my found tournaments:', tournaments.length);
-    res.json({ data: tournaments });
-  } catch (error) {
-    console.error('Error fetching user tournament history:', error.stack || error);
-    res.status(500).json({ message: 'Failed to fetch tournament history', error: error.message });
-  }
-});
 
 // Test route to check Cloudinary status
 router.get('/test/cloudinary', (req, res) => {
