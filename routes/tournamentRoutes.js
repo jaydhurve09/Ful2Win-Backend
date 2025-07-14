@@ -69,12 +69,12 @@ router.get('/my', protect, async (req, res) => {
     console.log('DEBUG /api/tournaments/my userId:', userId);
     // Fetch tournaments where currentPlayers array includes this user and populate game name
     const tournaments = await Tournament.find({ currentPlayers: userId })
-      .populate('game', 'name');
+      .populate('game', 'displayName');
     console.log('DEBUG /api/tournaments/my found tournaments:', tournaments.length);
     // Replace game field with its name for frontend simplicity
     const formatted = tournaments.map(t => {
       const obj = t.toObject();
-      obj.game = t.game?.name || t.game; // ensure string
+      obj.game = t.game?.displayName || t.game; // ensure string
       return obj;
     });
     res.json({ data: formatted });
