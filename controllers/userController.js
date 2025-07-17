@@ -133,7 +133,7 @@ const registerUser = async (req, res) => {
       phoneNumber,
       email,
       password, // Password will be hashed by the pre-save hook in the User model
-      Balance: 0,
+      Balance: 1000,
       followers: [],
       following: []
     };

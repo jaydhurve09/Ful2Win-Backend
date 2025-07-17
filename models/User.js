@@ -235,6 +235,7 @@ const userSchema = new mongoose.Schema({
       lastPlayed: Date
     }]
   },
+  //get 5 free chance to play
   
   // Tournament participation
   tournaments: [{

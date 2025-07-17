@@ -1,3 +1,4 @@
+import userModel from "../models/User.js";
 import scoreModel from "../models/Score.js";
 import Tournament from "../models/Tournament.js";
 
@@ -34,6 +35,9 @@ const gameScore = async (req, res) => {
         missingFields
       });
     }
+// get usermodel also
+ 
+   
 
     // Step 1: Auto-register if not already registered
     const tournament = await Tournament.findById(roomId);
@@ -41,7 +45,6 @@ const gameScore = async (req, res) => {
       return res.status(404).json({ message: "Tournament not found" });
     }
 
-   
 
     // Step 2: Check if the user already submitted a score
     const existingScore = await scoreModel.findOne({ userId, roomId, gameName });

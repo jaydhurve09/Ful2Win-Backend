@@ -6,7 +6,13 @@ const adminWalletSchema = new mongoose.Schema({
    type: Number,
    default: 0,
    min: 0,
- }
+ },
+
+  coin: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
 });
 const AdminWallet = mongoose.models.AdminWallet || mongoose.model("AdminWallet", adminWalletSchema);
 export default AdminWallet;
