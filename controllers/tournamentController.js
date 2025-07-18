@@ -390,22 +390,30 @@ const registerPlayer = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+   //tournament entry type case coin
+   
 
     // Check if user has enough balance
-    if (user.balance < tournament.entryFee) {
+    const type = tournament.tournamentType;
+    if (type === 'coin') {
+      if (user.coins < tournament.entryFee) {
       return res.status(400).json({ success: false, message: 'Insufficient balance' });
     }
 
+      user.coins -= tournament.entryFee;
+    }else if (type === 'cash') {
+      if (user.balance < tournament.entryFee) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance' });
+    }
 
+         user.balance -= tournament.entryFee;
+  }
     //add entry fee to tournament prize pool
     tournament.CollectPrize += tournament.entryFee;
     tournament.currentPlayers.push(playerId);
-const type = tournament.tournamentType;
-    if (type === 'coin') {
-      user.coins -= tournament.entryFee;
-    }else if (type === 'cash') {
-      user.balance -= tournament.entryFee;
-    }
+
+    
+    
     // Save both
     user.tournaments.push(tournamentId);
 await user.save();

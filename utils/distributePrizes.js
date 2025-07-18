@@ -35,7 +35,11 @@ export const distributePrizes = async (tournamentId) => {
 
       if (!user) continue;
       console.log("userfound");
-      user.balance = (user.balance || 0) + prizeAmount;
+      if(tournament.tournamentType === 'coin') {
+        user.coins = (user.coins || 0) + prizeAmount;
+      } else if(tournament.tournamentType === 'cash') {
+        user.balance = (user.balance || 0) + prizeAmount;
+      }
       updates.push(user.save());
 
       distributedAmount += prizeAmount;
@@ -50,7 +54,11 @@ export const distributePrizes = async (tournamentId) => {
       adminWallet = new AdminWallet();
     }
 
-    adminWallet.balance =(adminWallet.balance||0) + leftover;
+    if(tournament.tournamentType === 'coin') {
+      adminWallet.coin = (adminWallet.coin || 0) + leftover;
+    } else if(tournament.tournamentType === 'cash') {
+      adminWallet.balance = (adminWallet.balance || 0) + leftover;
+    }
     await adminWallet.save();
 
     // Mark tournament as prize distributed

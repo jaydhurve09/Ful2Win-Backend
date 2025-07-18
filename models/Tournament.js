@@ -40,7 +40,7 @@ const tournamentSchema = new mongoose.Schema({
   },
   tournamentType: {
     type: String,
-    enum: ['cash', 'coin'],
+    enum: ['cash', 'coin', 'free'],
     required: true,
     default: 'coin'
   },

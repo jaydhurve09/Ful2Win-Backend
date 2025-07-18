@@ -130,7 +130,7 @@ const userSchema = new mongoose.Schema({
   },
   balance: {
     type: Number,
-    default: 0.00,
+    default: 1000.00,
     min: 0,
     set: v => parseFloat(v.toFixed(2)) // Ensure 2 decimal places
   },
@@ -235,6 +235,7 @@ const userSchema = new mongoose.Schema({
       lastPlayed: Date
     }]
   },
+  //get 5 free chance to play
   
   // Tournament participation
   tournaments: [{
