@@ -292,25 +292,66 @@ const getGameSession = async (req, res) => {
 
 // Helper function to upload file to Cloudinary
 const uploadToCloudinary = async (file) => {
-  if (!file) return null;
+  if (!file) {
+    console.log('No file provided to uploadToCloudinary');
+    return null;
+  }
   
   try {
+    console.log('Starting Cloudinary upload for file:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      console.error('Invalid file type:', file.mimetype);
+      throw new Error(`Invalid file type: ${file.mimetype}. Allowed types: ${allowedTypes.join(', ')}`);
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      console.error('File too large:', file.size);
+      throw new Error(`File too large: ${file.size} bytes. Maximum allowed: ${maxSize} bytes`);
+    }
+    
     // Convert buffer to base64
     const b64 = Buffer.from(file.buffer).toString('base64');
     const dataURI = `data:${file.mimetype};base64,${b64}`;
+    
+    console.log('Uploading to Cloudinary...');
     
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(dataURI, {
       folder: 'ful2win/games',
       resource_type: 'auto',
       quality: 'auto',
-      fetch_format: 'auto'
+      fetch_format: 'auto',
+      transformation: [
+        { width: 512, height: 512, crop: 'fill', gravity: 'center' }, // For thumbnails
+        { quality: 'auto:good' }
+      ]
+    });
+    
+    console.log('Cloudinary upload successful:', {
+      public_id: result.public_id,
+      secure_url: result.secure_url,
+      format: result.format,
+      width: result.width,
+      height: result.height
     });
     
     return result.secure_url;
   } catch (error) {
     console.error('Error uploading to Cloudinary:', error);
-    return null;
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error; // Re-throw to handle in calling function
   }
 };
 
@@ -647,8 +688,13 @@ const createMatch = async (req, res) => {
 const updateGame = async (req, res) => {
   try {
     const { nameOrId } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
     const files = req.files;
+
+    console.log('=== UPDATE GAME DEBUG ===');
+    console.log('nameOrId:', nameOrId);
+    console.log('updateData:', updateData);
+    console.log('files:', files);
 
     // Check if the parameter is a valid ObjectId (24 char hex string)
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(nameOrId);
@@ -660,6 +706,8 @@ const updateGame = async (req, res) => {
       query = { name: nameOrId.toLowerCase() };
     }
 
+    console.log('Query:', query);
+
     // Find the existing game
     const existingGame = await Game.findOne(query);
     if (!existingGame) {
@@ -669,39 +717,102 @@ const updateGame = async (req, res) => {
       });
     }
 
+    console.log('Existing game found:', existingGame.name);
+    console.log('Current thumbnail:', existingGame.assets?.thumbnail);
+
     // Handle file uploads if any
     if (files) {
+      console.log('Processing file uploads...');
+      
       if (files.thumbnail) {
+        console.log('Uploading new thumbnail...');
+        console.log('Thumbnail file details:', {
+          originalname: files.thumbnail[0].originalname,
+          mimetype: files.thumbnail[0].mimetype,
+          size: files.thumbnail[0].size
+        });
+        
         const thumbnailResult = await uploadToCloudinary(files.thumbnail[0]);
-        updateData['assets.thumbnail'] = thumbnailResult.secure_url;
+        console.log('Thumbnail upload result:', thumbnailResult);
+        
+        if (thumbnailResult) {
+          updateData['assets.thumbnail'] = thumbnailResult;
+          console.log('Set thumbnail in updateData:', updateData['assets.thumbnail']);
+        } else {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to upload thumbnail to Cloudinary'
+          });
+        }
       }
+      
       if (files.coverImage) {
+        console.log('Uploading new cover image...');
         const coverImageResult = await uploadToCloudinary(files.coverImage[0]);
-        updateData['assets.coverImage'] = coverImageResult.secure_url;
+        console.log('Cover image upload result:', coverImageResult);
+        
+        if (coverImageResult) {
+          updateData['assets.coverImage'] = coverImageResult;
+        } else {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to upload cover image to Cloudinary'
+          });
+        }
       }
     }
 
-    // Update game data
+    console.log('Final updateData before database update:', updateData);
+
+    // Update game data with explicit field updates
     const updatedGame = await Game.findOneAndUpdate(
       query,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { 
+        new: true, 
+        runValidators: true,
+        lean: false // Ensure we get the full document with virtuals
+      }
     )
     .select('-__v -createdAt -updatedAt -moderators -community.forumThreads -chatRooms')
     .populate('creator', 'username avatar');
 
+    if (!updatedGame) {
+      return res.status(404).json({
+        success: false,
+        message: 'Game not found during update'
+      });
+    }
+
+    console.log('Game updated successfully');
+    console.log('New thumbnail:', updatedGame.assets?.thumbnail);
+
+    // Verify the update actually happened
+    const verifyGame = await Game.findOne(query).select('assets.thumbnail');
+    console.log('Verification - thumbnail in DB:', verifyGame?.assets?.thumbnail);
+
     res.json({
       success: true,
       message: 'Game updated successfully',
-      data: updatedGame
+      data: updatedGame,
+      debug: {
+        originalThumbnail: existingGame.assets?.thumbnail,
+        newThumbnail: updatedGame.assets?.thumbnail,
+        updateFields: Object.keys(updateData)
+      }
     });
 
   } catch (error) {
     console.error('Error updating game:', error);
+    console.error('Error stack:', error.stack);
+    
     res.status(500).json({
       success: false,
       message: 'Failed to update game',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack
+      } : undefined
     });
   }
 };
